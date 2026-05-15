@@ -1,0 +1,104 @@
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #0b0b0b;
+  color: #f1e3c4;
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.overlay {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: top left;
+  background: linear-gradient(180deg, #12100c, #231709);
+}
+
+.topbar, .ticker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  padding: 0 36px;
+  background: rgba(0,0,0,0.72);
+  border-bottom: 1px solid #4a3820;
+  box-sizing: border-box;
+}
+
+.topbar {
+  top: 0;
+}
+
+.ticker {
+  bottom: 0;
+  border-top: 1px solid #4a3820;
+  border-bottom: none;
+  font-size: 24px;
+  color: #e8a030;
+}
+
+.left-panel, .right-panel {
+  position: absolute;
+  top: 84px;
+  bottom: 84px;
+  width: 320px;
+  padding: 20px;
+  box-sizing: border-box;
+  background: rgba(0,0,0,0.58);
+  border: 1px solid #4a3820;
+}
+
+.left-panel { left: 24px; }
+.right-panel { right: 24px; }
+
+.world {
+  position: absolute;
+  left: 380px;
+  right: 380px;
+  top: 84px;
+  bottom: 84px;
+  border: 1px solid #4a3820;
+  background: radial-gradient(circle, #7a4d1b, #2c1c0c 65%);
+  overflow: hidden;
+}
+
+.world::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(45deg, rgba(255,255,255,.04) 25%, transparent 25%), linear-gradient(-45deg, rgba(255,255,255,.04) 25%, transparent 25%);
+  background-size: 80px 80px;
+  opacity: .35;
+}
+
+.npc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: rgba(232,160,48,0.08);
+  border: 1px solid #4a3820;
+}
+
+.diamond {
+  position: absolute;
+  width: 96px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e8a030;
+  color: #111;
+  transform: rotate(26deg) skew(-20deg);
+  font-weight: 700;
+}
+
+.d1 { left: 48%; top: 42%; }
+.d2 { left: 58%; top: 54%; }
+.d3 { left: 38%; top: 58%; }
