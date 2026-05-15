@@ -7,17 +7,27 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:init": "tsx scripts/init-db.ts",
+    "db:verify": "tsx scripts/verify-db.ts",
+    "phase13:verify": "npm run db:init && tsx scripts/verify-phase13.ts",
+    "phase10:verify": "tsx scripts/verify-phase10.ts",
+    "phase11:verify": "tsx scripts/verify-phase11.ts",
+    "phase12:verify": "tsx scripts/verify-phase12.ts",
+    "phase15:verify": "npm run db:init && tsx scripts/verify-phase15.ts"
   },
   "dependencies": {
     "@fastify/cors": "latest",
     "dotenv": "latest",
     "fastify": "latest",
     "pg": "latest",
+    "ws": "latest",
     "zod": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
+    "@types/pg": "^8.20.0",
+    "@types/ws": "latest",
     "tsx": "latest",
     "typescript": "latest"
   }

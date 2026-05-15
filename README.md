@@ -116,6 +116,23 @@ npm run dev:overlay
 npm run dev:viewer
 ```
 
+## Beta 演示一键启动
+
+```bash
+npm run beta:demo
+```
+
+这个脚本会重置数据库、启动 backend / streamer / overlay / viewer / admin、拉起 Cloudflare Quick Tunnel，并打印可直接演示的外网地址。流程说明见 [docs/BETA_RUNBOOK.md](docs/BETA_RUNBOOK.md)。
+
+## Cloudflare Tunnel 本地外网测试
+
+```text
+1. 先启动 backend 与三个前端 dev server。
+2. 将 `.env` 里的 `PUBLIC_STREAMER_BASE_URL` / `PUBLIC_OVERLAY_BASE_URL` / `PUBLIC_VIEWER_BASE_URL` 改成对应的外网地址。
+3. 分别执行 `npm run tunnel:streamer`、`npm run tunnel:overlay`、`npm run tunnel:viewer`。脚本会优先使用系统里的 `cloudflared`，Windows 下找不到时会自动下载临时二进制。
+4. 外网浏览器访问 tunnel URL，前端会通过同源 `/api` 代理读取本地后端。
+```
+
 ## 当前阶段
 
 ```text

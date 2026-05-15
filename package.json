@@ -6,13 +6,28 @@
     "backend",
     "frontend/streamer",
     "frontend/overlay",
-    "frontend/viewer"
+    "frontend/viewer",
+    "frontend/admin"
   ],
   "scripts": {
     "dev:backend": "npm --workspace backend run dev",
     "dev:streamer": "npm --workspace frontend/streamer run dev",
     "dev:overlay": "npm --workspace frontend/overlay run dev",
     "dev:viewer": "npm --workspace frontend/viewer run dev",
+    "dev:admin": "npm --workspace frontend/admin run dev",
+    "tunnel:streamer": "node scripts/run-cloudflared-tunnel.mjs http://localhost:5173",
+    "tunnel:overlay": "node scripts/run-cloudflared-tunnel.mjs http://localhost:5174",
+    "tunnel:viewer": "node scripts/run-cloudflared-tunnel.mjs http://localhost:5175",
+    "tunnel:admin": "node scripts/run-cloudflared-tunnel.mjs http://localhost:5176",
+    "db:init": "npm --workspace backend run db:init",
+    "db:verify": "npm --workspace backend run db:verify",
+    "beta:demo": "node scripts/run-beta-demo.mjs",
+    "phase14:demo": "npm run beta:demo",
+    "phase13:verify": "npm --workspace backend run phase13:verify",
+    "phase10:verify": "npm --workspace backend run phase10:verify",
+    "phase11:verify": "npm --workspace backend run phase11:verify",
+    "phase12:verify": "npm --workspace backend run phase12:verify",
+    "phase15:verify": "npm --workspace backend run phase15:verify",
     "build": "npm --workspaces run build",
     "typecheck": "npm --workspaces run typecheck"
   }
