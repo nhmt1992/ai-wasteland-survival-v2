@@ -102,6 +102,10 @@ type AuthenticatedSession = NonNullable<Awaited<ReturnType<typeof loadStreamerSe
 
 const localCorsOrigins = new Set(env.corsOrigins);
 
+function isProductionEnvironment(): boolean {
+  return env.NODE_ENV === 'production';
+}
+
 function isAllowedCorsOrigin(origin: string | null): boolean {
   if (!origin) {
     return true;
@@ -205,7 +209,7 @@ function serializeGiftConnection(connection: GiftSourceConnectionRow | null) {
     platform: connection.platform,
     connectionType: connection.connection_type,
     status: connection.status,
-    encryptedCredentials: connection.encrypted_credentials,
+    hasCredentials: connection.encrypted_credentials !== null && connection.encrypted_credentials !== undefined,
     lastConnectedAt: formatDate(connection.last_connected_at),
     lastError: connection.last_error,
     createdAt: formatDate(connection.created_at),
@@ -1571,7 +1575,7 @@ app.get('/api/viewer/my-npc', async (request) => {
 });
 
 app.post('/api/dev/streamers/:handle/plan', async (request) => {
-  if (env.NODE_ENV === 'production') {
+  if (isProductionEnvironment()) {
     throw notFound('Not found');
   }
 
@@ -1595,6 +1599,10 @@ app.post('/api/dev/streamers/:handle/plan', async (request) => {
 });
 
 app.post('/api/dev/gift-events', async (request) => {
+  if (isProductionEnvironment()) {
+    throw notFound('Not found');
+  }
+
   const body = z
     .object({
       worldId: z.string().min(1).optional(),
@@ -1661,6 +1669,10 @@ app.post('/api/dev/gift-events', async (request) => {
 });
 
 app.post('/api/dev/tick', async (request) => {
+  if (isProductionEnvironment()) {
+    throw notFound('Not found');
+  }
+
   const body = z
     .object({
       worldId: z.string().min(1).optional(),

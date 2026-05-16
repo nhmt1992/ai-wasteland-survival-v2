@@ -14,7 +14,8 @@
     "phase10:verify": "tsx scripts/verify-phase10.ts",
     "phase11:verify": "tsx scripts/verify-phase11.ts",
     "phase12:verify": "tsx scripts/verify-phase12.ts",
-    "phase15:verify": "npm run db:init && tsx scripts/verify-phase15.ts"
+    "phase15:verify": "npm run db:init && tsx scripts/verify-phase15.ts",
+    "verify:tick-transaction": "npm run db:init && tsx scripts/verify-tick-transaction.ts"
   },
   "dependencies": {
     "@fastify/cors": "latest",

@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { env } from './env.js';
 
 export const STREAMER_SESSION_COOKIE_NAME = 'aws_streamer_session';
 export const STREAMER_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
@@ -7,6 +8,10 @@ export const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 function serializeCookie(parts: string[]): string {
   return parts.join('; ');
+}
+
+function appendSecureAttribute(parts: string[]): string[] {
+  return env.NODE_ENV === 'production' ? [...parts, 'Secure'] : parts;
 }
 
 export function createSessionToken(): string {
@@ -49,46 +54,46 @@ export function readCookieValue(cookieHeader: string | string[] | undefined, nam
 
 export function buildSessionCookie(token: string, expiresAt: Date): string {
   const maxAge = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
-  return serializeCookie([
+  return serializeCookie(appendSecureAttribute([
     `${STREAMER_SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
     `Max-Age=${maxAge}`,
     `Expires=${expiresAt.toUTCString()}`,
-  ]);
+  ]));
 }
 
 export function buildClearedSessionCookie(): string {
-  return serializeCookie([
+  return serializeCookie(appendSecureAttribute([
     `${STREAMER_SESSION_COOKIE_NAME}=`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
     'Max-Age=0',
     'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-  ]);
+  ]));
 }
 
 export function buildAdminSessionCookie(token: string, expiresAt: Date): string {
   const maxAge = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
-  return serializeCookie([
+  return serializeCookie(appendSecureAttribute([
     `${ADMIN_SESSION_COOKIE_NAME}=${encodeURIComponent(token)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
     `Max-Age=${maxAge}`,
     `Expires=${expiresAt.toUTCString()}`,
-  ]);
+  ]));
 }
 
 export function buildClearedAdminSessionCookie(): string {
-  return serializeCookie([
+  return serializeCookie(appendSecureAttribute([
     `${ADMIN_SESSION_COOKIE_NAME}=`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',
     'Max-Age=0',
     'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
-  ]);
+  ]));
 }

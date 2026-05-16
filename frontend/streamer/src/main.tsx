@@ -53,7 +53,7 @@ type GiftConnection = {
   platform: string;
   connectionType: GiftAdapterType;
   status: 'not_connected' | 'connecting' | 'connected' | 'reconnecting' | 'failed' | 'test_mode';
-  encryptedCredentials: Record<string, unknown> | null;
+  hasCredentials: boolean;
   lastConnectedAt: string | null;
   lastError: string | null;
   createdAt: string;
@@ -1389,7 +1389,7 @@ function DashboardApp({ session, onLogout }: { session: AuthResponse; onLogout: 
               <strong>{giftConnectionLabel}</strong>
               <span className="metric-sub">
                 {giftConnection
-                  ? `${giftConnectionStatusLabel} / ${giftConnection.platform}`
+                  ? `${giftConnectionStatusLabel} / ${giftConnection.platform} / ${giftConnection.hasCredentials ? '認証情報あり' : '認証情報なし'}`
                   : currentLiveSession
                     ? '配信開始後に有効になります'
                     : '配信開始後に有効になります'}
@@ -1954,7 +1954,7 @@ function BillingPage({
                 <strong>{giftConnection ? formatGiftAdapterLabel(giftConnection.connectionType) : '未設定'}</strong>
                 <span className="metric-sub">
                   {giftConnection
-                    ? `${formatGiftConnectionStatusLabel(giftConnection.status)} / ${giftConnection.platform}`
+                    ? `${formatGiftConnectionStatusLabel(giftConnection.status)} / ${giftConnection.platform} / ${giftConnection.hasCredentials ? '認証情報あり' : '認証情報なし'}`
                     : '接続先を選んでください'}
                 </span>
               </div>

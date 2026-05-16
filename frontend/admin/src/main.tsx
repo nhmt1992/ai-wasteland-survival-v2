@@ -5,6 +5,20 @@ import './style.css';
 type PlanType = 'free_trial' | 'starter' | 'pro' | 'studio';
 type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'expired';
 type OperationalStatus = 'active' | 'paused';
+type GiftAdapterType = 'dev_mock' | 'manual' | 'tiktok_experimental' | 'future_official';
+type GiftConnection = {
+  id: string;
+  tenantId: string;
+  streamerId: string;
+  platform: string;
+  connectionType: GiftAdapterType;
+  status: 'not_connected' | 'connecting' | 'connected' | 'reconnecting' | 'failed' | 'test_mode';
+  hasCredentials: boolean;
+  lastConnectedAt: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
 type Tenant = {
   id: string;
@@ -212,6 +226,7 @@ type AdminConsoleContext = {
   tenant: Tenant;
   streamer: Streamer;
   subscription: Subscription | null;
+  giftConnection: GiftConnection | null;
   planLimits: PlanLimits;
   stats: {
     worldCount: number;

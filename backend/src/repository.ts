@@ -4964,16 +4964,6 @@ export async function persistWorldTickOutcome(
   }
 
   await insertWorldEvents(db, outcome.worldEvents);
-
-  publishWorldUpdate(worldId, {
-    type: 'world_tick_completed',
-    tick: outcome.nextTick,
-    npcCount: outcome.worldTick.npc_count,
-    aliveCount: outcome.worldTick.alive_count,
-    deadCount: outcome.worldTick.dead_count,
-    eventCount: outcome.worldEvents.length,
-    worldStatus: outcome.worldStatus,
-  });
 }
 
 export async function listTickableWorlds(db: SqlExecutor): Promise<WorldSummaryRow[]> {

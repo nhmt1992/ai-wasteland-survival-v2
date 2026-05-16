@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { withTransaction } from './db.js';
 import { env } from './env.js';
 import { loadWorldTickContext, listTickableWorlds, persistWorldTickOutcome, type SqlExecutor } from './repository.js';
+import { realtimeHub } from './realtime.js';
 import type {
   ItemDefinitionRow,
   NpcInventoryRow,
@@ -447,7 +449,7 @@ function maybeSpawnGrant(
       bestTileX,
       bestTileY,
       {
-        grantId: grant.id,
+        resourceGrantId: grant.id,
         packId: grant.pack_id,
       },
     ),
@@ -478,7 +480,7 @@ function claimGrant(
         npcId,
         grant.spawn_tile_x,
         grant.spawn_tile_y,
-        { grantId: grant.id, packId: null },
+        { resourceGrantId: grant.id, packId: null },
       ),
     };
   }
@@ -500,7 +502,7 @@ function claimGrant(
       grant.spawn_tile_x,
       grant.spawn_tile_y,
       {
-        grantId: grant.id,
+        resourceGrantId: grant.id,
         packId: grant.pack_id,
       },
     ),
@@ -589,7 +591,7 @@ function decideAction(
       targetX: claimed.grant.spawn_tile_x,
       targetY: claimed.grant.spawn_tile_y,
       metadata: {
-        grantId: claimed.grant.id,
+        resourceGrantId: claimed.grant.id,
         packId: claimed.grant.pack_id,
       },
     };
@@ -893,7 +895,7 @@ function decideAction(
         `${npc.name} が支援箱を拾いました`,
         decision.descriptionJa,
         npc.id,
-        decision.metadata.grantId ? String(decision.metadata.grantId) : null,
+        npc.id,
         decision.targetX,
         decision.targetY,
         decision.metadata,
@@ -1141,6 +1143,27 @@ export function advanceWorldTick(context: WorldTickContext): WorldTickOutcome {
   };
 }
 
+function publishWorldTickOutcome(worldId: string, outcome: WorldTickOutcome): void {
+  realtimeHub.publishWorldMessage(worldId, {
+    type: 'world_tick_completed',
+    tick: outcome.nextTick,
+    npcCount: outcome.worldTick.npc_count,
+    aliveCount: outcome.worldTick.alive_count,
+    deadCount: outcome.worldTick.dead_count,
+    eventCount: outcome.worldEvents.length,
+    worldStatus: outcome.worldStatus,
+  });
+}
+
+async function executeWorldTick(worldId: string): Promise<WorldTickOutcome> {
+  return withTransaction(async (client) => {
+    const context = await loadWorldTickContext(client, worldId);
+    const outcome = advanceWorldTick(context);
+    await persistWorldTickOutcome(client, worldId, outcome);
+    return outcome;
+  });
+}
+
 function isWorldDue(world: { status: WorldStatus; tick_interval_seconds: number; last_tick_started_at: Date | null }, now: Date): boolean {
   if (world.status !== 'active' && world.status !== 'live') {
     return false;
@@ -1164,9 +1187,8 @@ export async function runTickScheduler(db: SqlExecutor): Promise<Array<{ worldId
       continue;
     }
 
-    const context = await loadWorldTickContext(db, world.id);
-    const outcome = advanceWorldTick(context);
-    await persistWorldTickOutcome(db, world.id, outcome);
+    const outcome = await executeWorldTick(world.id);
+    publishWorldTickOutcome(world.id, outcome);
     processed.push({ worldId: world.id, nextTick: outcome.nextTick });
   }
 
@@ -1175,9 +1197,8 @@ export async function runTickScheduler(db: SqlExecutor): Promise<Array<{ worldId
 
 export async function runManualTick(db: SqlExecutor, worldId?: string | null): Promise<Array<{ worldId: string; nextTick: number }>> {
   if (worldId) {
-    const context = await loadWorldTickContext(db, worldId);
-    const outcome = advanceWorldTick(context);
-    await persistWorldTickOutcome(db, worldId, outcome);
+    const outcome = await executeWorldTick(worldId);
+    publishWorldTickOutcome(worldId, outcome);
     return [{ worldId, nextTick: outcome.nextTick }];
   }
 
@@ -1185,9 +1206,8 @@ export async function runManualTick(db: SqlExecutor, worldId?: string | null): P
   const results: Array<{ worldId: string; nextTick: number }> = [];
 
   for (const world of worlds) {
-    const context = await loadWorldTickContext(db, world.id);
-    const outcome = advanceWorldTick(context);
-    await persistWorldTickOutcome(db, world.id, outcome);
+    const outcome = await executeWorldTick(world.id);
+    publishWorldTickOutcome(world.id, outcome);
     results.push({ worldId: world.id, nextTick: outcome.nextTick });
   }
 
