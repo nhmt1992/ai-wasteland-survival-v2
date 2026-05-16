@@ -9,3 +9,4 @@ coverage
 .cache
 .vite
 .playwright-mcp/
+output/

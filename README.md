@@ -132,6 +132,42 @@ docs/                 设计与规格文档
 - 统一暖色末日 palette
 - 低 chrome 的游戏式 HUD
 
+### 主播使用
+
+1. 启动后端与 `game-client`：
+
+```bash
+npm run dev:backend
+npm run dev:game
+```
+
+2. 打开窗口地址：
+
+```text
+http://localhost:5177/game/matt/00000000-0000-0000-0000-000000000101?mode=live
+```
+
+3. 如果要做性能和画面验证，使用 stress 模式：
+
+```text
+http://localhost:5177/game/matt/00000000-0000-0000-0000-000000000101?mode=stress&npcCount=1000&debug=1
+```
+
+4. 直播采集时建议：
+
+- 用 OBS 的 Window Capture 采集 `game-client` 窗口。
+- 全屏前先确认窗口尺寸是 1920 x 1080 或主播常用采集分辨率。
+- 使用 `debug=1` 只做开发验收，正式直播时关闭。
+- 需要移动视角时可拖拽，滚轮缩放。
+
+### 生产构建
+
+```bash
+npm --workspace game-client run build
+```
+
+构建产物输出在 `game-client/dist/`，用于本地静态预览或后续封装。
+
 ## 技术栈
 
 | 模块 | 技术 |
