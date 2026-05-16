@@ -348,8 +348,16 @@ function Resize-ServiceCards {
   )
 
   $availableWidth = [Math]::Max(780, $PanelHost.ClientSize.Width - $PanelHost.Padding.Left - $PanelHost.Padding.Right - 8)
-  foreach ($entry in $Ui.GetEnumerator()) {
-    $entry.Value.Card.Width = $availableWidth
+  foreach ($cardUi in $Ui.Values) {
+    if ($null -eq $cardUi) {
+      continue
+    }
+
+    if (-not ($cardUi.PSObject.Properties.Match('Card').Count -gt 0)) {
+      continue
+    }
+
+    $cardUi.Card.Width = $availableWidth
   }
 }
 
@@ -805,7 +813,7 @@ function Refresh-AllUi {
 
   $footerLabel.Text = "Repo root: $repoRoot  |  Running: $runningCount / $($serviceDefinitions.Count)"
   $footerHint.Text = "Backend Target: $backendTarget"
-  Resize-ServiceCards -Host $serviceHost -Ui $ui.Services
+  Resize-ServiceCards -PanelHost $serviceHost -Ui $ui.Services
 }
 
 $openBackendButton.Add_Click({ Open-Url -Url "http://127.0.0.1:$backendPort/health" })
