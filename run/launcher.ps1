@@ -320,11 +320,15 @@ function Update-ServiceCard {
 
 function Refresh-Overview {
   param(
-    [hashtable]$Overview,
+    [psobject]$Overview,
     [hashtable]$ServiceState,
     [int]$BackendPort,
     [string]$BackendTarget
   )
+
+  if ($null -eq $Overview -or -not ($Overview.PSObject.Properties.Match('Backend').Count -gt 0)) {
+    return
+  }
 
   $runningCount = 0
   foreach ($entry in $ServiceState.GetEnumerator()) {
@@ -702,6 +706,12 @@ $overviewCards = @{
 
 foreach ($card in @($overviewCards.Backend, $overviewCards.Running, $overviewCards.Default)) {
   $overviewPanel.Controls.Add($card.Panel)
+}
+
+$ui.Overview = [pscustomobject]@{
+  Backend = $overviewCards.Backend
+  Running = $overviewCards.Running
+  Default = $overviewCards.Default
 }
 
 $actionsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
