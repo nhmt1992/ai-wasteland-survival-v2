@@ -267,7 +267,7 @@ function Get-ServiceUiState {
 function Update-ServiceCard {
   param(
     [string]$Key,
-    [hashtable]$Ui,
+    [pscustomobject]$Ui,
     [pscustomobject]$State,
     [System.Drawing.Color]$ThemeAccent,
     [System.Drawing.Color]$ThemeSuccess,
