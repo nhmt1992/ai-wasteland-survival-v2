@@ -1,7 +1,22 @@
-﻿Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$defaultStreamerHandle = 'matt'
+$defaultWorldId = '00000000-0000-0000-0000-000000000101'
+
+function Escape-PowerShellSingleQuote {
+  param([string]$Value)
+
+  if ($null -eq $Value) {
+    return ''
+  }
+
+  return $Value.Replace("'", "''")
+}
 
 function Test-PortAvailable {
   param([int]$Port)
@@ -18,7 +33,7 @@ function Test-PortAvailable {
       try {
         $listener.Stop()
       } catch {
-        # Ignore cleanup failures.
+        # Ignore close-time race conditions.
       }
     }
   }
@@ -33,152 +48,457 @@ function Get-FreeBackendPort {
     }
   }
 
-  throw "无法找到可用的后端端口（从 $PreferredPort 开始）"
+  throw "No free backend port found starting from $PreferredPort"
+}
+
+function Show-Message {
+  param(
+    [string]$Text,
+    [string]$Title,
+    [System.Windows.Forms.MessageBoxIcon]$Icon = [System.Windows.Forms.MessageBoxIcon]::Information
+  )
+
+  [System.Windows.Forms.MessageBox]::Show(
+    $Text,
+    $Title,
+    [System.Windows.Forms.MessageBoxButtons]::OK,
+    $Icon
+  ) | Out-Null
+}
+
+function Open-Path {
+  param([string]$Path)
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    throw "File not found: $Path"
+  }
+
+  Invoke-Item -LiteralPath $Path
+}
+
+function Open-Url {
+  param([string]$Url)
+
+  if ([string]::IsNullOrWhiteSpace($Url)) {
+    return
+  }
+
+  Start-Process -FilePath $Url | Out-Null
+}
+
+function New-ServiceDefinition {
+  param(
+    [string]$Key,
+    [string]$Label,
+    [string]$Description,
+    [string]$Command,
+    [string]$WindowTitle,
+    [string]$WorkspacePath,
+    [string]$TargetUrl,
+    [string]$Role,
+    [int]$Port
+  )
+
+  [pscustomobject]@{
+    Key = $Key
+    Label = $Label
+    Description = $Description
+    Command = $Command
+    WindowTitle = $WindowTitle
+    WorkspacePath = $WorkspacePath
+    TargetUrl = $TargetUrl
+    Role = $Role
+    Port = $Port
+  }
+}
+
+function Build-ServiceCommand {
+  param(
+    [pscustomobject]$Service,
+    [string]$BackendTarget,
+    [int]$BackendPort
+  )
+
+  $parts = New-Object System.Collections.Generic.List[string]
+  $parts.Add("`$Host.UI.RawUI.WindowTitle = '$(Escape-PowerShellSingleQuote $Service.WindowTitle)'")
+
+  if ($Service.Role -eq 'backend') {
+    $parts.Add("`$env:PORT = '$BackendPort'")
+  } else {
+    $parts.Add("`$env:VITE_BACKEND_TARGET = '$BackendTarget'")
+  }
+
+  $parts.Add("Set-Location -LiteralPath '$(Escape-PowerShellSingleQuote $Service.WorkspacePath)'")
+  $parts.Add($Service.Command)
+
+  return ($parts -join '; ')
+}
+
+function New-StatusChip {
+  param([string]$Text)
+
+  $label = New-Object System.Windows.Forms.Label
+  $label.AutoSize = $false
+  $label.Width = 104
+  $label.Height = 30
+  $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+  $label.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
+  $label.Padding = New-Object System.Windows.Forms.Padding(6, 4, 6, 4)
+  $label.Text = $Text
+  return $label
+}
+
+function Set-ChipState {
+  param(
+    [System.Windows.Forms.Label]$Label,
+    [string]$Text,
+    [System.Drawing.Color]$BackColor,
+    [System.Drawing.Color]$ForeColor
+  )
+
+  $Label.Text = $Text
+  $Label.BackColor = $BackColor
+  $Label.ForeColor = $ForeColor
+}
+
+function New-ActionButton {
+  param([string]$Text)
+
+  $button = New-Object System.Windows.Forms.Button
+  $button.Text = $Text
+  $button.Width = 118
+  $button.Height = 36
+  $button.FlatStyle = 'Flat'
+  $button.FlatAppearance.BorderSize = 0
+  $button.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::SemiBold)
+  $button.BackColor = [System.Drawing.Color]::FromArgb(58, 64, 72)
+  $button.ForeColor = [System.Drawing.Color]::White
+  return $button
+}
+
+function New-InfoCard {
+  param(
+    [string]$Title,
+    [string]$Value,
+    [string]$Note
+  )
+
+  $panel = New-Object System.Windows.Forms.Panel
+  $panel.BackColor = [System.Drawing.Color]::FromArgb(34, 38, 44)
+  $panel.BorderStyle = 'FixedSingle'
+  $panel.Size = New-Object System.Drawing.Size(320, 104)
+  $panel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 12, 0)
+
+  $titleLabel = New-Object System.Windows.Forms.Label
+  $titleLabel.Location = New-Object System.Drawing.Point(14, 10)
+  $titleLabel.Size = New-Object System.Drawing.Size(280, 18)
+  $titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(190, 199, 209)
+  $titleLabel.Font = New-Object System.Drawing.Font('Segoe UI', 8.5)
+  $titleLabel.Text = $Title
+
+  $valueLabel = New-Object System.Windows.Forms.Label
+  $valueLabel.Location = New-Object System.Drawing.Point(14, 34)
+  $valueLabel.Size = New-Object System.Drawing.Size(290, 24)
+  $valueLabel.ForeColor = [System.Drawing.Color]::White
+  $valueLabel.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 11)
+  $valueLabel.Text = $Value
+
+  $noteLabel = New-Object System.Windows.Forms.Label
+  $noteLabel.Location = New-Object System.Drawing.Point(14, 63)
+  $noteLabel.Size = New-Object System.Drawing.Size(290, 24)
+  $noteLabel.ForeColor = [System.Drawing.Color]::FromArgb(166, 176, 186)
+  $noteLabel.Font = New-Object System.Drawing.Font('Segoe UI', 8.5)
+  $noteLabel.Text = $Note
+
+  $panel.Controls.AddRange(@($titleLabel, $valueLabel, $noteLabel))
+
+  return [pscustomobject]@{
+    Panel = $panel
+    Value = $valueLabel
+    Note = $noteLabel
+  }
+}
+
+function Test-ServiceRunning {
+  param([pscustomobject]$State)
+
+  if ($null -eq $State.Process) {
+    return $false
+  }
+
+  try {
+    if ($State.Process.HasExited) {
+      $State.LastExitCode = $State.Process.ExitCode
+      $State.Process = $null
+      if ($State.LastExitCode -eq 0) {
+        $State.Status = 'Exited'
+      } else {
+        $State.Status = "Exited ($($State.LastExitCode))"
+      }
+      return $false
+    }
+  } catch {
+    $State.Process = $null
+    $State.Status = 'Stopped'
+    return $false
+  }
+
+  return $true
+}
+
+function Get-ServiceUiState {
+  param([pscustomobject]$State)
+
+  if (Test-ServiceRunning -State $State) {
+    return 'running'
+  }
+
+  if ($State.Status -like 'Launch failed*') {
+    return 'failed'
+  }
+
+  if ($State.Status -like 'Exited*') {
+    return 'stopped'
+  }
+
+  return 'idle'
+}
+
+function Update-ServiceCard {
+  param(
+    [string]$Key,
+    [hashtable]$Ui,
+    [pscustomobject]$State,
+    [System.Drawing.Color]$ThemeAccent,
+    [System.Drawing.Color]$ThemeSuccess,
+    [System.Drawing.Color]$ThemeDanger,
+    [System.Drawing.Color]$ThemeSurfaceStrong,
+    [System.Drawing.Color]$ThemeText
+  )
+
+  $chip = $Ui.Status
+  $running = Test-ServiceRunning -State $State
+  $stateKind = Get-ServiceUiState -State $State
+
+  switch ($stateKind) {
+    'running' {
+      Set-ChipState -Label $chip -Text 'Running' -BackColor $ThemeSuccess -ForeColor $ThemeText
+      $Ui.Start.Enabled = $false
+      $Ui.Stop.Enabled = $true
+    }
+    'failed' {
+      Set-ChipState -Label $chip -Text 'Launch failed' -BackColor $ThemeDanger -ForeColor $ThemeText
+      $Ui.Start.Enabled = $true
+      $Ui.Stop.Enabled = $false
+    }
+    'stopped' {
+      Set-ChipState -Label $chip -Text $State.Status -BackColor $ThemeSurfaceStrong -ForeColor $ThemeText
+      $Ui.Start.Enabled = $true
+      $Ui.Stop.Enabled = $false
+    }
+    default {
+      Set-ChipState -Label $chip -Text $State.Status -BackColor $ThemeSurfaceStrong -ForeColor $ThemeText
+      $Ui.Start.Enabled = $true
+      $Ui.Stop.Enabled = $false
+    }
+  }
+
+  if ($running) {
+    $Ui.Start.Enabled = $false
+    $Ui.Stop.Enabled = $true
+  }
+
+  $Ui.Endpoint.Text = "Open: $($State.Definition.TargetUrl)"
+  if ($State.Status -like 'Launch failed*' -and -not [string]::IsNullOrWhiteSpace($State.LastError)) {
+    $Ui.Detail.Text = "Error: $($State.LastError)"
+  } elseif ($State.LastStartedAt) {
+    $Ui.Detail.Text = "Started at: $($State.LastStartedAt.ToString('yyyy-MM-dd HH:mm:ss'))"
+  } else {
+    $Ui.Detail.Text = $State.Definition.Description
+  }
+}
+
+function Refresh-Overview {
+  param(
+    [hashtable]$Overview,
+    [hashtable]$ServiceState,
+    [int]$BackendPort,
+    [string]$BackendTarget
+  )
+
+  $runningCount = 0
+  foreach ($entry in $ServiceState.GetEnumerator()) {
+    if (Test-ServiceRunning -State $entry.Value) {
+      $runningCount += 1
+    }
+  }
+
+  $Overview.Backend.Value.Text = $BackendTarget
+  $Overview.Backend.Note.Text = "Backend port: $BackendPort"
+  $Overview.Running.Value.Text = "$runningCount / $($ServiceState.Count)"
+  $Overview.Running.Note.Text = 'Running dev services'
+  $Overview.Default.Value.Text = "$defaultStreamerHandle / $defaultWorldId"
+  $Overview.Default.Note.Text = 'Default streamer and default world seed'
+}
+
+function Resize-ServiceCards {
+  param(
+    [System.Windows.Forms.FlowLayoutPanel]$Host,
+    [hashtable]$Ui
+  )
+
+  $availableWidth = [Math]::Max(780, $Host.ClientSize.Width - $Host.Padding.Left - $Host.Padding.Right - 8)
+  foreach ($entry in $Ui.GetEnumerator()) {
+    $entry.Value.Card.Width = $availableWidth
+  }
 }
 
 $backendPort = Get-FreeBackendPort
 $backendTarget = "http://127.0.0.1:$backendPort"
 
+$theme = @{
+  Background = [System.Drawing.Color]::FromArgb(20, 22, 26)
+  Surface = [System.Drawing.Color]::FromArgb(30, 34, 40)
+  SurfaceAlt = [System.Drawing.Color]::FromArgb(36, 41, 48)
+  SurfaceStrong = [System.Drawing.Color]::FromArgb(46, 52, 60)
+  Border = [System.Drawing.Color]::FromArgb(67, 74, 84)
+  Accent = [System.Drawing.Color]::FromArgb(82, 126, 224)
+  Success = [System.Drawing.Color]::FromArgb(54, 146, 87)
+  Danger = [System.Drawing.Color]::FromArgb(172, 68, 60)
+  Text = [System.Drawing.Color]::White
+  Muted = [System.Drawing.Color]::FromArgb(182, 190, 199)
+}
+
 $serviceDefinitions = @(
-  [pscustomobject]@{
-    Key = 'backend'
-    Label = '后端'
-    Command = 'npm run dev:backend'
-    WindowTitle = 'AI Wasteland Survival v2 - 后端'
-    Description = '服务端、世界状态、Tick、礼物事件'
-    Role = 'backend'
-  },
-  [pscustomobject]@{
-    Key = 'game'
-    Label = 'game-client'
-    Command = 'npm run dev:game'
-    WindowTitle = 'AI Wasteland Survival v2 - game-client'
-    Description = '主播窗口 2.5D 游戏画面'
-    Role = 'frontend'
-  },
-  [pscustomobject]@{
-    Key = 'streamer'
-    Label = '主播端'
-    Command = 'npm run dev:streamer'
-    WindowTitle = 'AI Wasteland Survival v2 - 主播端'
-    Description = '主播控制台'
-    Role = 'frontend'
-  },
-  [pscustomobject]@{
-    Key = 'overlay'
-    Label = 'Overlay'
-    Command = 'npm run dev:overlay'
-    WindowTitle = 'AI Wasteland Survival v2 - Overlay'
-    Description = 'OBS 叠层界面'
-    Role = 'frontend'
-  },
-  [pscustomobject]@{
-    Key = 'viewer'
-    Label = '用户端'
-    Command = 'npm run dev:viewer'
-    WindowTitle = 'AI Wasteland Survival v2 - 用户端'
-    Description = '观众创建与查看页面'
-    Role = 'frontend'
-  },
-  [pscustomobject]@{
-    Key = 'admin'
-    Label = '管理端'
-    Command = 'npm run dev:admin'
-    WindowTitle = 'AI Wasteland Survival v2 - 管理端'
-    Description = '平台管理控制台'
-    Role = 'frontend'
-  }
+  New-ServiceDefinition `
+    -Key 'backend' `
+    -Label 'Backend' `
+    -Description 'Server, world state, ticks, gift events' `
+    -Command 'npm run dev:backend' `
+    -WindowTitle 'AI Wasteland Survival v2 - Backend' `
+    -WorkspacePath $repoRoot `
+    -TargetUrl "http://127.0.0.1:$backendPort/health" `
+    -Role 'backend' `
+    -Port $backendPort
+  New-ServiceDefinition `
+    -Key 'game' `
+    -Label 'game-client' `
+    -Description '2.5D game window for the streamer' `
+    -Command 'npm run dev:game' `
+    -WindowTitle 'AI Wasteland Survival v2 - game-client' `
+    -WorkspacePath $repoRoot `
+    -TargetUrl "http://127.0.0.1:5177/game/$defaultStreamerHandle/$defaultWorldId?mode=live" `
+    -Role 'frontend' `
+    -Port 5177
+  New-ServiceDefinition `
+    -Key 'streamer' `
+    -Label 'Streamer' `
+    -Description 'Streamer control console' `
+    -Command 'npm run dev:streamer' `
+    -WindowTitle 'AI Wasteland Survival v2 - Streamer' `
+    -WorkspacePath $repoRoot `
+    -TargetUrl "http://127.0.0.1:5173/" `
+    -Role 'frontend' `
+    -Port 5173
+  New-ServiceDefinition `
+    -Key 'overlay' `
+    -Label 'Overlay' `
+    -Description 'OBS overlay surface' `
+    -Command 'npm run dev:overlay' `
+    -WindowTitle 'AI Wasteland Survival v2 - Overlay' `
+    -WorkspacePath $repoRoot `
+    -TargetUrl "http://127.0.0.1:5174/" `
+    -Role 'frontend' `
+    -Port 5174
+  New-ServiceDefinition `
+    -Key 'viewer' `
+    -Label 'Viewer' `
+    -Description 'Viewer create and watch pages' `
+    -Command 'npm run dev:viewer' `
+    -WindowTitle 'AI Wasteland Survival v2 - Viewer' `
+    -WorkspacePath $repoRoot `
+    -TargetUrl "http://127.0.0.1:5175/s/$defaultStreamerHandle/create" `
+    -Role 'frontend' `
+    -Port 5175
+  New-ServiceDefinition `
+    -Key 'admin' `
+    -Label 'Admin' `
+    -Description 'Platform admin console' `
+    -Command 'npm run dev:admin' `
+    -WindowTitle 'AI Wasteland Survival v2 - Admin' `
+    -WorkspacePath $repoRoot `
+    -TargetUrl "http://127.0.0.1:5176/" `
+    -Role 'frontend' `
+    -Port 5176
 )
 
 $serviceState = @{}
-foreach ($service in $serviceDefinitions) {
-  $serviceState[$service.Key] = [pscustomobject]@{
-    Definition = $service
+foreach ($definition in $serviceDefinitions) {
+  $serviceState[$definition.Key] = [pscustomobject]@{
+    Definition = $definition
     Process = $null
-    Status = '已停止'
+    Status = 'Stopped'
+    LastStartedAt = $null
+    LastExitCode = $null
+    LastError = $null
   }
 }
 
-$ui = @{}
-
-function Test-ServiceRunning {
-  param([string]$Key)
-  $state = $serviceState[$Key]
-  return $null -ne $state.Process -and -not $state.Process.HasExited
-}
-
-function Update-ServiceUi {
-  param([string]$Key)
-
-  $state = $serviceState[$Key]
-  $widgets = $ui[$Key]
-  $running = Test-ServiceRunning -Key $Key
-
-  if ($running) {
-    $state.Status = '运行中'
-    $widgets.Status.Text = '运行中'
-    $widgets.Status.BackColor = [System.Drawing.Color]::FromArgb(54, 93, 60)
-    $widgets.Status.ForeColor = [System.Drawing.Color]::White
-    $widgets.Start.Enabled = $false
-    $widgets.Stop.Enabled = $true
-    return
-  }
-
-  if ($null -ne $state.Process -and $state.Process.HasExited) {
-    $state.Process = $null
-    $state.Status = '已停止'
-  }
-
-  $widgets.Status.Text = $state.Status
-  $widgets.Status.BackColor = [System.Drawing.Color]::FromArgb(70, 70, 70)
-  $widgets.Status.ForeColor = [System.Drawing.Color]::White
-  $widgets.Start.Enabled = $true
-  $widgets.Stop.Enabled = $false
-}
-
-function Refresh-AllServiceUi {
-  foreach ($service in $serviceDefinitions) {
-    Update-ServiceUi -Key $service.Key
-  }
+$ui = @{
+  Overview = @{}
+  Services = @{}
 }
 
 function Start-ServiceWindow {
   param([string]$Key)
 
-  if (Test-ServiceRunning -Key $Key) {
+  $state = $serviceState[$Key]
+  if (Test-ServiceRunning -State $state) {
     return
   }
 
-  $state = $serviceState[$Key]
-  $definition = $state.Definition
-  $rootLiteral = $repoRoot.Replace("'", "''")
-  $titleLiteral = $definition.WindowTitle.Replace("'", "''")
-  $sharedEnv = "`$env:VITE_BACKEND_TARGET = '$backendTarget'; "
-  $backendEnv = if ($definition.Role -eq 'backend') { "`$env:PORT = '$backendPort'; " } else { '' }
-  $command = "`$Host.UI.RawUI.WindowTitle = '$titleLiteral'; $backendEnv$sharedEnv Set-Location -LiteralPath '$rootLiteral'; $($definition.Command)"
-
   try {
-    $state.Process = Start-Process -FilePath 'powershell.exe' -WindowStyle Normal -WorkingDirectory $repoRoot -ArgumentList @(
-      '-NoLogo',
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-Command',
-      $command
-    ) -PassThru
-    $state.Status = '运行中'
+    $state.Status = 'Launching'
+    $state.LastError = $null
+    $state.LastExitCode = $null
+
+    $command = Build-ServiceCommand -Service $state.Definition -BackendTarget $backendTarget -BackendPort $backendPort
+    $child = Start-Process `
+      -FilePath 'powershell.exe' `
+      -WorkingDirectory $repoRoot `
+      -WindowStyle Normal `
+      -PassThru `
+      -ArgumentList @(
+        '-NoLogo',
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-NoExit',
+        '-Command',
+        $command
+      )
+
+    $state.Process = $child
+    $state.LastStartedAt = Get-Date
+    $state.Status = 'Running'
   } catch {
     $state.Process = $null
-    $state.Status = '启动失败'
-    [System.Windows.Forms.MessageBox]::Show(
-      "无法启动 $($definition.Label)：$($_.Exception.Message)",
-      '启动失败',
-      [System.Windows.Forms.MessageBoxButtons]::OK,
-      [System.Windows.Forms.MessageBoxIcon]::Error
-    ) | Out-Null
+    $state.Status = 'Launch failed'
+    $state.LastError = $_.Exception.Message
+    Show-Message -Text "Failed to launch $($state.Definition.Label): $($state.LastError)" -Title 'Launch failed' -Icon Error
   }
 
-  Update-ServiceUi -Key $Key
+  Update-ServiceCard `
+    -Key $Key `
+    -Ui $ui.Services[$Key] `
+    -State $state `
+    -ThemeAccent $theme.Accent `
+    -ThemeSuccess $theme.Success `
+    -ThemeDanger $theme.Danger `
+    -ThemeSurfaceStrong $theme.SurfaceStrong `
+    -ThemeText $theme.Text
+
+  Refresh-Overview -Overview $ui.Overview -ServiceState $serviceState -BackendPort $backendPort -BackendTarget $backendTarget
 }
 
 function Stop-ServiceWindow {
@@ -186,7 +506,17 @@ function Stop-ServiceWindow {
 
   $state = $serviceState[$Key]
   if ($null -eq $state.Process) {
-    Update-ServiceUi -Key $Key
+    $state.Status = 'Stopped'
+    Update-ServiceCard `
+      -Key $Key `
+      -Ui $ui.Services[$Key] `
+      -State $state `
+      -ThemeAccent $theme.Accent `
+      -ThemeSuccess $theme.Success `
+      -ThemeDanger $theme.Danger `
+      -ThemeSurfaceStrong $theme.SurfaceStrong `
+      -ThemeText $theme.Text
+    Refresh-Overview -Overview $ui.Overview -ServiceState $serviceState -BackendPort $backendPort -BackendTarget $backendTarget
     return
   }
 
@@ -195,192 +525,296 @@ function Stop-ServiceWindow {
       & taskkill.exe /PID $state.Process.Id /T /F | Out-Null
     }
   } catch {
-    # 终止窗口时忽略常见的竞态错误。
+    # Ignore common process races while closing.
   }
 
   $state.Process = $null
-  $state.Status = '已停止'
-  Update-ServiceUi -Key $Key
+  $state.Status = 'Stopped'
+  $state.LastExitCode = $null
+
+  Update-ServiceCard `
+    -Key $Key `
+    -Ui $ui.Services[$Key] `
+    -State $state `
+    -ThemeAccent $theme.Accent `
+    -ThemeSuccess $theme.Success `
+    -ThemeDanger $theme.Danger `
+    -ThemeSurfaceStrong $theme.SurfaceStrong `
+    -ThemeText $theme.Text
+
+  Refresh-Overview -Overview $ui.Overview -ServiceState $serviceState -BackendPort $backendPort -BackendTarget $backendTarget
 }
 
 function Stop-AllServiceWindow {
-  foreach ($service in $serviceDefinitions) {
-    Stop-ServiceWindow -Key $service.Key
+  foreach ($definition in $serviceDefinitions) {
+    Stop-ServiceWindow -Key $definition.Key
   }
 }
 
-function New-StatusBadge {
-  param(
-    [string]$Text,
-    [int]$Width
-  )
+function Create-ServiceCard {
+  param([pscustomobject]$Definition)
 
-  $label = New-Object System.Windows.Forms.Label
-  $label.Text = $Text
-  $label.AutoSize = $false
-  $label.Width = $Width
-  $label.Height = 30
-  $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-  $label.Font = New-Object System.Drawing.Font('Microsoft YaHei UI', 9, [System.Drawing.FontStyle]::Bold)
-  $label.Padding = New-Object System.Windows.Forms.Padding(6, 4, 6, 4)
-  return $label
+  $panel = New-Object System.Windows.Forms.Panel
+  $panel.BackColor = $theme.Surface
+  $panel.BorderStyle = 'FixedSingle'
+  $panel.Margin = New-Object System.Windows.Forms.Padding(0, 0, 0, 12)
+  $panel.Padding = New-Object System.Windows.Forms.Padding(14, 12, 14, 12)
+  $panel.Height = 164
+
+  $header = New-Object System.Windows.Forms.Panel
+  $header.Dock = 'Top'
+  $header.Height = 32
+
+  $title = New-Object System.Windows.Forms.Label
+  $title.AutoSize = $false
+  $title.Dock = 'Fill'
+  $title.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+  $title.Padding = New-Object System.Windows.Forms.Padding(0, 0, 8, 0)
+  $title.ForeColor = $theme.Text
+  $title.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 12)
+  $title.Text = $Definition.Label
+
+  $status = New-StatusChip -Text 'Stopped'
+  $status.Dock = 'Right'
+  $status.BackColor = $theme.SurfaceStrong
+  $status.ForeColor = $theme.Text
+
+  $header.Controls.Add($status)
+  $header.Controls.Add($title)
+
+  $detail = New-Object System.Windows.Forms.Label
+  $detail.Dock = 'Top'
+  $detail.Height = 24
+  $detail.Margin = New-Object System.Windows.Forms.Padding(0, 8, 0, 0)
+  $detail.ForeColor = $theme.Muted
+  $detail.Font = New-Object System.Drawing.Font('Segoe UI', 8.75)
+  $detail.Text = $Definition.Description
+
+  $command = New-Object System.Windows.Forms.Label
+  $command.Dock = 'Top'
+  $command.Height = 22
+  $command.Margin = New-Object System.Windows.Forms.Padding(0, 8, 0, 0)
+  $command.ForeColor = [System.Drawing.Color]::FromArgb(216, 220, 226)
+  $command.Font = New-Object System.Drawing.Font('Consolas', 8.5)
+  $command.Text = $Definition.Command
+
+  $endpoint = New-Object System.Windows.Forms.Label
+  $endpoint.Dock = 'Top'
+  $endpoint.Height = 22
+  $endpoint.Margin = New-Object System.Windows.Forms.Padding(0, 8, 0, 0)
+  $endpoint.ForeColor = [System.Drawing.Color]::FromArgb(144, 198, 255)
+  $endpoint.Font = New-Object System.Drawing.Font('Segoe UI', 8.5)
+  $endpoint.Text = "Open: $($Definition.TargetUrl)"
+
+  $actions = New-Object System.Windows.Forms.FlowLayoutPanel
+  $actions.Dock = 'Bottom'
+  $actions.Height = 40
+  $actions.FlowDirection = 'LeftToRight'
+  $actions.WrapContents = $false
+  $actions.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
+
+  $startButton = New-ActionButton -Text 'Start'
+  $stopButton = New-ActionButton -Text 'Stop'
+  $openButton = New-ActionButton -Text 'Open'
+
+  $startButton.BackColor = $theme.Accent
+  $stopButton.BackColor = $theme.Danger
+  $openButton.BackColor = [System.Drawing.Color]::FromArgb(70, 76, 84)
+
+  $serviceKey = $Definition.Key
+  $startButton.Add_Click({ Start-ServiceWindow -Key $serviceKey }.GetNewClosure())
+  $stopButton.Add_Click({ Stop-ServiceWindow -Key $serviceKey }.GetNewClosure())
+  $openButton.Add_Click({ Open-Url -Url $Definition.TargetUrl }.GetNewClosure())
+
+  $actions.Controls.AddRange(@($startButton, $stopButton, $openButton))
+
+  $panel.Controls.Add($actions)
+  $panel.Controls.Add($endpoint)
+  $panel.Controls.Add($command)
+  $panel.Controls.Add($detail)
+  $panel.Controls.Add($header)
+
+  return [pscustomobject]@{
+    Card = $panel
+    Status = $status
+    Start = $startButton
+    Stop = $stopButton
+    Open = $openButton
+    Detail = $detail
+    Command = $command
+    Endpoint = $endpoint
+  }
 }
 
+[System.Windows.Forms.Application]::EnableVisualStyles()
+
 $form = New-Object System.Windows.Forms.Form
-$form.Text = 'AI Wasteland Run 启动器'
+$form.Text = 'AI Wasteland Survival v2 - Dev Launcher'
 $form.StartPosition = 'CenterScreen'
-$form.Size = New-Object System.Drawing.Size(1100, 560)
-$form.MinimumSize = New-Object System.Drawing.Size(980, 520)
-$form.BackColor = [System.Drawing.Color]::FromArgb(24, 22, 20)
-$form.ForeColor = [System.Drawing.Color]::Gainsboro
-$form.Font = New-Object System.Drawing.Font('Microsoft YaHei UI', 9.5)
+$form.Size = New-Object System.Drawing.Size(1280, 900)
+$form.MinimumSize = New-Object System.Drawing.Size(1120, 760)
+$form.BackColor = $theme.Background
+$form.ForeColor = $theme.Text
+$form.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Dpi
 
 $header = New-Object System.Windows.Forms.Panel
 $header.Dock = 'Top'
-$header.Height = 92
-$header.Padding = New-Object System.Windows.Forms.Padding(16, 14, 16, 10)
-$header.BackColor = [System.Drawing.Color]::FromArgb(36, 32, 28)
+$header.Height = 108
+$header.Padding = New-Object System.Windows.Forms.Padding(18, 14, 18, 10)
+$header.BackColor = $theme.SurfaceAlt
 $form.Controls.Add($header)
 
 $title = New-Object System.Windows.Forms.Label
 $title.AutoSize = $true
-$title.Text = 'AI Wasteland Survival v2 - 窗口启动器'
-$title.Font = New-Object System.Drawing.Font('Microsoft YaHei UI', 16, [System.Drawing.FontStyle]::Bold)
-$title.Location = New-Object System.Drawing.Point(16, 12)
+$title.Location = New-Object System.Drawing.Point(18, 12)
+$title.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 16)
+$title.ForeColor = $theme.Text
+$title.Text = 'AI Wasteland Survival v2'
 $header.Controls.Add($title)
 
 $subtitle = New-Object System.Windows.Forms.Label
 $subtitle.AutoSize = $true
-$subtitle.Text = '每个服务都会在独立窗口启动。你可以单独启动、单独关闭，或一键全部启动/关闭。'
-$subtitle.Location = New-Object System.Drawing.Point(18, 48)
-$subtitle.ForeColor = [System.Drawing.Color]::FromArgb(205, 195, 182)
+$subtitle.Location = New-Object System.Drawing.Point(20, 48)
+$subtitle.Font = New-Object System.Drawing.Font('Segoe UI', 9.5)
+$subtitle.ForeColor = $theme.Muted
+$subtitle.Text = 'Single-streamer launch panel: unified backend port, unified frontend proxy, unified start/stop.'
 $header.Controls.Add($subtitle)
 
-$actions = New-Object System.Windows.Forms.FlowLayoutPanel
-$actions.Dock = 'Right'
-$actions.Width = 370
-$actions.FlowDirection = 'LeftToRight'
-$actions.WrapContents = $false
-$actions.Padding = New-Object System.Windows.Forms.Padding(0, 6, 0, 0)
-$header.Controls.Add($actions)
+$headerActions = New-Object System.Windows.Forms.FlowLayoutPanel
+$headerActions.Dock = 'Right'
+$headerActions.Width = 560
+$headerActions.FlowDirection = 'LeftToRight'
+$headerActions.WrapContents = $false
+$headerActions.Padding = New-Object System.Windows.Forms.Padding(0, 2, 0, 0)
+$header.Controls.Add($headerActions)
 
-function New-TopButton {
-  param([string]$Text)
-  $button = New-Object System.Windows.Forms.Button
-  $button.Text = $Text
-  $button.Width = 110
-  $button.Height = 34
-  $button.FlatStyle = 'Flat'
-  $button.BackColor = [System.Drawing.Color]::FromArgb(63, 58, 54)
-  $button.ForeColor = [System.Drawing.Color]::White
-  return $button
+$openReadmeButton = New-ActionButton -Text 'Open README'
+$openRunbookButton = New-ActionButton -Text 'Open Runbook'
+$openReadmeButton.BackColor = [System.Drawing.Color]::FromArgb(70, 76, 84)
+$openRunbookButton.BackColor = [System.Drawing.Color]::FromArgb(70, 76, 84)
+$openReadmeButton.Add_Click({ Open-Path -Path (Join-Path $repoRoot 'README.md') })
+$openRunbookButton.Add_Click({ Open-Path -Path (Join-Path $repoRoot 'docs/BETA_RUNBOOK.md') })
+$headerActions.Controls.AddRange(@($openReadmeButton, $openRunbookButton))
+
+$overviewPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+$overviewPanel.Dock = 'Top'
+$overviewPanel.Height = 120
+$overviewPanel.Padding = New-Object System.Windows.Forms.Padding(18, 14, 18, 6)
+$overviewPanel.FlowDirection = 'LeftToRight'
+$overviewPanel.WrapContents = $false
+$overviewPanel.BackColor = $theme.Background
+$form.Controls.Add($overviewPanel)
+
+$overviewCards = @{
+  Backend = New-InfoCard -Title 'Backend target' -Value $backendTarget -Note 'Launcher picks a free port automatically'
+  Running = New-InfoCard -Title 'Running services' -Value '0 / 0' -Note 'Status refreshes automatically'
+  Default = New-InfoCard -Title 'Default streamer / world' -Value "$defaultStreamerHandle / $defaultWorldId" -Note 'Used by game-client and viewer shortcuts'
 }
 
-$startAllButton = New-TopButton -Text '全部启动'
-$stopAllButton = New-TopButton -Text '全部关闭'
-$refreshButton = New-TopButton -Text '刷新状态'
-$openReadmeButton = New-TopButton -Text '打开说明'
-
-$actions.Controls.AddRange(@($startAllButton, $stopAllButton, $refreshButton, $openReadmeButton))
-
-$body = New-Object System.Windows.Forms.TableLayoutPanel
-$body.Dock = 'Fill'
-$body.Padding = New-Object System.Windows.Forms.Padding(16, 12, 16, 16)
-$body.ColumnCount = 5
-$body.RowCount = $serviceDefinitions.Count + 1
-$body.BackColor = [System.Drawing.Color]::FromArgb(24, 22, 20)
-[void]$body.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 160)))
-[void]$body.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Percent, 100)))
-[void]$body.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 120)))
-[void]$body.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 110)))
-[void]$body.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle([System.Windows.Forms.SizeType]::Absolute, 110)))
-$form.Controls.Add($body)
-
-function Add-HeaderCell {
-  param([string]$Text)
-  $label = New-Object System.Windows.Forms.Label
-  $label.Text = $Text
-  $label.Dock = 'Fill'
-  $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
-  $label.Font = New-Object System.Drawing.Font('Microsoft YaHei UI', 10, [System.Drawing.FontStyle]::Bold)
-  $label.ForeColor = [System.Drawing.Color]::FromArgb(236, 220, 196)
-  $label.Padding = New-Object System.Windows.Forms.Padding(4, 6, 4, 6)
-  return $label
+foreach ($card in @($overviewCards.Backend, $overviewCards.Running, $overviewCards.Default)) {
+  $overviewPanel.Controls.Add($card.Panel)
 }
 
-$body.Controls.Add((Add-HeaderCell -Text '服务'), 0, 0)
-$body.Controls.Add((Add-HeaderCell -Text '命令'), 1, 0)
-$body.Controls.Add((Add-HeaderCell -Text '状态'), 2, 0)
-$body.Controls.Add((Add-HeaderCell -Text '启动'), 3, 0)
-$body.Controls.Add((Add-HeaderCell -Text '关闭'), 4, 0)
+$actionsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
+$actionsPanel.Dock = 'Top'
+$actionsPanel.Height = 52
+$actionsPanel.Padding = New-Object System.Windows.Forms.Padding(18, 0, 18, 8)
+$actionsPanel.FlowDirection = 'LeftToRight'
+$actionsPanel.WrapContents = $false
+$actionsPanel.BackColor = $theme.Background
+$form.Controls.Add($actionsPanel)
 
-for ($index = 0; $index -lt $serviceDefinitions.Count; $index++) {
-  $definition = $serviceDefinitions[$index]
-  $row = $index + 1
+$startAllButton = New-ActionButton -Text 'Start all'
+$stopAllButton = New-ActionButton -Text 'Stop all'
+$refreshButton = New-ActionButton -Text 'Refresh'
+$openBackendButton = New-ActionButton -Text 'Open backend'
+$openGameButton = New-ActionButton -Text 'Open game-client'
+$openViewerButton = New-ActionButton -Text 'Open viewer'
 
-  $nameLabel = New-Object System.Windows.Forms.Label
-  $nameLabel.Text = $definition.Label
-  $nameLabel.Dock = 'Fill'
-  $nameLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
-  $nameLabel.Padding = New-Object System.Windows.Forms.Padding(4, 8, 4, 8)
+$startAllButton.BackColor = $theme.Accent
+$stopAllButton.BackColor = $theme.Danger
+$refreshButton.BackColor = [System.Drawing.Color]::FromArgb(70, 76, 84)
+$openBackendButton.BackColor = [System.Drawing.Color]::FromArgb(70, 76, 84)
+$openGameButton.BackColor = [System.Drawing.Color]::FromArgb(70, 76, 84)
+$openViewerButton.BackColor = [System.Drawing.Color]::FromArgb(70, 76, 84)
 
-  $commandLabel = New-Object System.Windows.Forms.Label
-  $commandLabel.Text = $definition.Command
-  $commandLabel.Dock = 'Fill'
-  $commandLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
-  $commandLabel.Padding = New-Object System.Windows.Forms.Padding(4, 8, 4, 8)
-  $commandLabel.ForeColor = [System.Drawing.Color]::FromArgb(214, 200, 184)
+$actionsPanel.Controls.AddRange(@(
+  $startAllButton,
+  $stopAllButton,
+  $refreshButton,
+  $openBackendButton,
+  $openGameButton,
+  $openViewerButton
+))
 
-  $statusLabel = New-StatusBadge -Text '已停止' -Width 100
-  $statusLabel.Anchor = 'Left'
+$serviceHost = New-Object System.Windows.Forms.FlowLayoutPanel
+$serviceHost.Dock = 'Fill'
+$serviceHost.Padding = New-Object System.Windows.Forms.Padding(18, 0, 18, 12)
+$serviceHost.FlowDirection = 'TopDown'
+$serviceHost.WrapContents = $false
+$serviceHost.AutoScroll = $true
+$serviceHost.BackColor = $theme.Background
+$form.Controls.Add($serviceHost)
 
-  $startButton = New-Object System.Windows.Forms.Button
-  $startButton.Text = '启动'
-  $startButton.Dock = 'Fill'
-  $startButton.FlatStyle = 'Flat'
-  $startButton.BackColor = [System.Drawing.Color]::FromArgb(87, 112, 77)
-  $startButton.ForeColor = [System.Drawing.Color]::White
-
-  $stopButton = New-Object System.Windows.Forms.Button
-  $stopButton.Text = '关闭'
-  $stopButton.Dock = 'Fill'
-  $stopButton.FlatStyle = 'Flat'
-  $stopButton.BackColor = [System.Drawing.Color]::FromArgb(122, 66, 55)
-  $stopButton.ForeColor = [System.Drawing.Color]::White
-
-  $key = $definition.Key
-  $startButton.Add_Click({ Start-ServiceWindow -Key $key }.GetNewClosure())
-  $stopButton.Add_Click({ Stop-ServiceWindow -Key $key }.GetNewClosure())
-
-  $body.Controls.Add($nameLabel, 0, $row)
-  $body.Controls.Add($commandLabel, 1, $row)
-  $body.Controls.Add($statusLabel, 2, $row)
-  $body.Controls.Add($startButton, 3, $row)
-  $body.Controls.Add($stopButton, 4, $row)
-
-  $ui[$definition.Key] = [pscustomobject]@{
-    Status = $statusLabel
-    Start = $startButton
-    Stop = $stopButton
-  }
+foreach ($definition in $serviceDefinitions) {
+  $cardUi = Create-ServiceCard -Definition $definition
+  $ui.Services[$definition.Key] = $cardUi
+  $serviceHost.Controls.Add($cardUi.Card)
 }
 
-$footer = New-Object System.Windows.Forms.Panel
-$footer.Dock = 'Bottom'
-$footer.Height = 34
-$footer.BackColor = [System.Drawing.Color]::FromArgb(30, 28, 25)
-$footer.Padding = New-Object System.Windows.Forms.Padding(16, 6, 16, 6)
+$footer = New-Object System.Windows.Forms.StatusStrip
+$footer.SizingGrip = $false
+$footer.BackColor = $theme.SurfaceAlt
+$footer.ForeColor = $theme.Muted
+
+$footerLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
+$footerLabel.Spring = $true
+$footerLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+$footerLabel.Text = "Repo root: $repoRoot"
+
+$footerHint = New-Object System.Windows.Forms.ToolStripStatusLabel
+$footerHint.AutoSize = $true
+$footerHint.Text = "Backend Port: $backendPort"
+
+$footer.Items.AddRange(@($footerLabel, $footerHint))
 $form.Controls.Add($footer)
 
-$footerLabel = New-Object System.Windows.Forms.Label
-$footerLabel.Dock = 'Fill'
-$footerLabel.Text = "项目根目录：$repoRoot  |  后端端口：$backendPort"
-$footerLabel.ForeColor = [System.Drawing.Color]::FromArgb(190, 180, 170)
-$footer.Controls.Add($footerLabel)
+function Refresh-AllUi {
+  foreach ($definition in $serviceDefinitions) {
+    $state = $serviceState[$definition.Key]
+    Update-ServiceCard `
+      -Key $definition.Key `
+      -Ui $ui.Services[$definition.Key] `
+      -State $state `
+      -ThemeAccent $theme.Accent `
+      -ThemeSuccess $theme.Success `
+      -ThemeDanger $theme.Danger `
+      -ThemeSurfaceStrong $theme.SurfaceStrong `
+      -ThemeText $theme.Text
+  }
+
+  Refresh-Overview -Overview $ui.Overview -ServiceState $serviceState -BackendPort $backendPort -BackendTarget $backendTarget
+
+  $runningCount = 0
+  foreach ($stateEntry in $serviceState.GetEnumerator()) {
+    if (Test-ServiceRunning -State $stateEntry.Value) {
+      $runningCount += 1
+    }
+  }
+
+  $footerLabel.Text = "Repo root: $repoRoot  |  Running: $runningCount / $($serviceDefinitions.Count)"
+  $footerHint.Text = "Backend Target: $backendTarget"
+  Resize-ServiceCards -Host $serviceHost -Ui $ui.Services
+}
+
+$openBackendButton.Add_Click({ Open-Url -Url "http://127.0.0.1:$backendPort/health" })
+$openGameButton.Add_Click({ Open-Url -Url "http://127.0.0.1:5177/game/$defaultStreamerHandle/$defaultWorldId?mode=live" })
+$openViewerButton.Add_Click({ Open-Url -Url "http://127.0.0.1:5175/s/$defaultStreamerHandle/create" })
 
 $startAllButton.Add_Click({
-  foreach ($service in $serviceDefinitions) {
-    Start-ServiceWindow -Key $service.Key
+  foreach ($definition in $serviceDefinitions) {
+    Start-ServiceWindow -Key $definition.Key
   }
 })
 
@@ -389,29 +823,33 @@ $stopAllButton.Add_Click({
 })
 
 $refreshButton.Add_Click({
-  Refresh-AllServiceUi
+  Refresh-AllUi
 })
 
-$openReadmeButton.Add_Click({
-  $readmePath = Join-Path $PSScriptRoot 'README.md'
-  Invoke-Item $readmePath
+$serviceHost.Add_SizeChanged({
+  Resize-ServiceCards -Host $serviceHost -Ui $ui.Services
 })
 
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 700
-$timer.Add_Tick({ Refresh-AllServiceUi })
+$timer.Add_Tick({
+  Refresh-AllUi
+})
 $timer.Start()
 
-$form.Add_Shown({ Refresh-AllServiceUi })
+$form.Add_Shown({
+  Refresh-AllUi
+})
+
 $form.Add_FormClosing({
-  $running = $serviceDefinitions | Where-Object { Test-ServiceRunning -Key $_.Key }
+  $running = $serviceDefinitions | Where-Object { Test-ServiceRunning -State $serviceState[$_.Key] }
   if ($running.Count -eq 0) {
     return
   }
 
   $result = [System.Windows.Forms.MessageBox]::Show(
-    '还有服务正在运行，关闭启动器时是否同时关闭所有已启动窗口？',
-    '确认退出',
+    'Some services are still running. Close all launched windows when exiting the launcher?',
+    'Confirm exit',
     [System.Windows.Forms.MessageBoxButtons]::YesNoCancel,
     [System.Windows.Forms.MessageBoxIcon]::Question
   )
@@ -429,5 +867,4 @@ $form.Add_FormClosing({
   $_.Cancel = $true
 })
 
-[System.Windows.Forms.Application]::EnableVisualStyles()
 [System.Windows.Forms.Application]::Run($form)
