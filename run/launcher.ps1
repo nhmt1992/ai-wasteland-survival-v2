@@ -825,7 +825,7 @@ $form.Add_Shown({
 })
 
 $form.Add_FormClosing({
-  $running = $serviceDefinitions | Where-Object { Test-ServiceRunning -State $serviceState[$_.Key] }
+  $running = @($serviceDefinitions | Where-Object { Test-ServiceRunning -State $serviceState[$_.Key] })
   if ($running.Count -eq 0) {
     return
   }
