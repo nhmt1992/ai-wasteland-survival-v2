@@ -170,7 +170,7 @@ function New-ActionButton {
   $button.Height = 36
   $button.FlatStyle = 'Flat'
   $button.FlatAppearance.BorderSize = 0
-  $button.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::SemiBold)
+  $button.Font = New-Object System.Drawing.Font('Segoe UI', 9, [System.Drawing.FontStyle]::Bold)
   $button.BackColor = [System.Drawing.Color]::FromArgb(58, 64, 72)
   $button.ForeColor = [System.Drawing.Color]::White
   return $button
@@ -377,7 +377,7 @@ $serviceDefinitions = @(
     -Command 'npm run dev:backend' `
     -WindowTitle 'AI Wasteland Survival v2 - Backend' `
     -WorkspacePath $repoRoot `
-    -TargetUrl "http://127.0.0.1:$backendPort/health" `
+    -TargetUrl "http://127.0.0.1:${backendPort}/health" `
     -Role 'backend' `
     -Port $backendPort
   New-ServiceDefinition `
@@ -387,7 +387,7 @@ $serviceDefinitions = @(
     -Command 'npm run dev:game' `
     -WindowTitle 'AI Wasteland Survival v2 - game-client' `
     -WorkspacePath $repoRoot `
-    -TargetUrl "http://127.0.0.1:5177/game/$defaultStreamerHandle/$defaultWorldId?mode=live" `
+    -TargetUrl "http://127.0.0.1:5177/game/${defaultStreamerHandle}/${defaultWorldId}?mode=live" `
     -Role 'frontend' `
     -Port 5177
   New-ServiceDefinition `
@@ -417,7 +417,7 @@ $serviceDefinitions = @(
     -Command 'npm run dev:viewer' `
     -WindowTitle 'AI Wasteland Survival v2 - Viewer' `
     -WorkspacePath $repoRoot `
-    -TargetUrl "http://127.0.0.1:5175/s/$defaultStreamerHandle/create" `
+    -TargetUrl "http://127.0.0.1:5175/s/${defaultStreamerHandle}/create" `
     -Role 'frontend' `
     -Port 5175
   New-ServiceDefinition `
@@ -809,8 +809,8 @@ function Refresh-AllUi {
 }
 
 $openBackendButton.Add_Click({ Open-Url -Url "http://127.0.0.1:$backendPort/health" })
-$openGameButton.Add_Click({ Open-Url -Url "http://127.0.0.1:5177/game/$defaultStreamerHandle/$defaultWorldId?mode=live" })
-$openViewerButton.Add_Click({ Open-Url -Url "http://127.0.0.1:5175/s/$defaultStreamerHandle/create" })
+$openGameButton.Add_Click({ Open-Url -Url "http://127.0.0.1:5177/game/${defaultStreamerHandle}/${defaultWorldId}?mode=live" })
+$openViewerButton.Add_Click({ Open-Url -Url "http://127.0.0.1:5175/s/${defaultStreamerHandle}/create" })
 
 $startAllButton.Add_Click({
   foreach ($definition in $serviceDefinitions) {
