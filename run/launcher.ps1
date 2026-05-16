@@ -343,11 +343,11 @@ function Refresh-Overview {
 
 function Resize-ServiceCards {
   param(
-    [System.Windows.Forms.FlowLayoutPanel]$Host,
+    [System.Windows.Forms.FlowLayoutPanel]$PanelHost,
     [hashtable]$Ui
   )
 
-  $availableWidth = [Math]::Max(780, $Host.ClientSize.Width - $Host.Padding.Left - $Host.Padding.Right - 8)
+  $availableWidth = [Math]::Max(780, $PanelHost.ClientSize.Width - $PanelHost.Padding.Left - $PanelHost.Padding.Right - 8)
   foreach ($entry in $Ui.GetEnumerator()) {
     $entry.Value.Card.Width = $availableWidth
   }
@@ -827,7 +827,7 @@ $refreshButton.Add_Click({
 })
 
 $serviceHost.Add_SizeChanged({
-  Resize-ServiceCards -Host $serviceHost -Ui $ui.Services
+  Resize-ServiceCards -PanelHost $serviceHost -Ui $ui.Services
 })
 
 $timer = New-Object System.Windows.Forms.Timer
@@ -839,6 +839,7 @@ $timer.Start()
 
 $form.Add_Shown({
   Refresh-AllUi
+  Resize-ServiceCards -PanelHost $serviceHost -Ui $ui.Services
 })
 
 $form.Add_FormClosing({
