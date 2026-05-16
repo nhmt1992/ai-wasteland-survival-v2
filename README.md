@@ -32,6 +32,7 @@ AI Wasteland Survival v2 是一个面向多个 TikTok 主播的 SaaS 版 AI-NPC 
 - Viewer / Creator MVP
 - 模拟礼物闭环
 - `game-client` 2.5D 主播窗口游戏客户端
+- `run/launcher` 图形化窗口启动器
 
 ### 不做
 
@@ -249,6 +250,7 @@ npm run verify:tick-transaction
 - [docs/OVERLAY_VISUAL_SPEC.md](docs/OVERLAY_VISUAL_SPEC.md)：OBS Overlay 视觉规格
 - [docs/GAME_CLIENT_DEVELOPMENT_PLAN.md](docs/GAME_CLIENT_DEVELOPMENT_PLAN.md)：主播窗口游戏客户端开发计划
 - [docs/GAME_CLIENT_USER_MANUAL_CN.md](docs/GAME_CLIENT_USER_MANUAL_CN.md)：`game-client` 中文使用说明书
+- [run/README.md](run/README.md)：窗口启动器使用说明
 - [docs/BETA_RUNBOOK.md](docs/BETA_RUNBOOK.md)：Beta 演示启动与恢复流程
 - [supabase/schema.sql](supabase/schema.sql)：PostgreSQL 初始化 SQL
 - [AGENTS.md](AGENTS.md)：AI 开发 Agent 规则

@@ -17,6 +17,7 @@
     "dev:overlay": "npm --workspace frontend/overlay run dev",
     "dev:viewer": "npm --workspace frontend/viewer run dev",
     "dev:admin": "npm --workspace frontend/admin run dev",
+    "run:launcher": "powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -STA -File run/launcher.ps1",
     "tunnel:streamer": "node scripts/run-cloudflared-tunnel.mjs http://localhost:5173",
     "tunnel:overlay": "node scripts/run-cloudflared-tunnel.mjs http://localhost:5174",
     "tunnel:viewer": "node scripts/run-cloudflared-tunnel.mjs http://localhost:5175",
