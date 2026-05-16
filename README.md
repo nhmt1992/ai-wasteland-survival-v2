@@ -248,6 +248,7 @@ npm run verify:tick-transaction
 - [docs/ASSET_PIPELINE.md](docs/ASSET_PIPELINE.md)：素材尺寸与命名规范
 - [docs/OVERLAY_VISUAL_SPEC.md](docs/OVERLAY_VISUAL_SPEC.md)：OBS Overlay 视觉规格
 - [docs/GAME_CLIENT_DEVELOPMENT_PLAN.md](docs/GAME_CLIENT_DEVELOPMENT_PLAN.md)：主播窗口游戏客户端开发计划
+- [docs/GAME_CLIENT_USER_MANUAL_CN.md](docs/GAME_CLIENT_USER_MANUAL_CN.md)：`game-client` 中文使用说明书
 - [docs/BETA_RUNBOOK.md](docs/BETA_RUNBOOK.md)：Beta 演示启动与恢复流程
 - [supabase/schema.sql](supabase/schema.sql)：PostgreSQL 初始化 SQL
 - [AGENTS.md](AGENTS.md)：AI 开发 Agent 规则
