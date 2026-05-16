@@ -341,26 +341,6 @@ function Refresh-Overview {
   $Overview.Default.Note.Text = 'Default streamer and default world seed'
 }
 
-function Resize-ServiceCards {
-  param(
-    [System.Windows.Forms.FlowLayoutPanel]$PanelHost,
-    [hashtable]$Ui
-  )
-
-  $availableWidth = [Math]::Max(780, $PanelHost.ClientSize.Width - $PanelHost.Padding.Left - $PanelHost.Padding.Right - 8)
-  foreach ($cardUi in $Ui.Values) {
-    if ($null -eq $cardUi) {
-      continue
-    }
-
-    if (-not ($cardUi.PSObject.Properties.Match('Card').Count -gt 0)) {
-      continue
-    }
-
-    $cardUi.Card.Width = $availableWidth
-  }
-}
-
 $backendPort = Get-FreeBackendPort
 $backendTarget = "http://127.0.0.1:$backendPort"
 
@@ -813,7 +793,6 @@ function Refresh-AllUi {
 
   $footerLabel.Text = "Repo root: $repoRoot  |  Running: $runningCount / $($serviceDefinitions.Count)"
   $footerHint.Text = "Backend Target: $backendTarget"
-  Resize-ServiceCards -PanelHost $serviceHost -Ui $ui.Services
 }
 
 $openBackendButton.Add_Click({ Open-Url -Url "http://127.0.0.1:$backendPort/health" })
@@ -834,10 +813,6 @@ $refreshButton.Add_Click({
   Refresh-AllUi
 })
 
-$serviceHost.Add_SizeChanged({
-  Resize-ServiceCards -PanelHost $serviceHost -Ui $ui.Services
-})
-
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 700
 $timer.Add_Tick({
@@ -847,7 +822,6 @@ $timer.Start()
 
 $form.Add_Shown({
   Refresh-AllUi
-  Resize-ServiceCards -PanelHost $serviceHost -Ui $ui.Services
 })
 
 $form.Add_FormClosing({
