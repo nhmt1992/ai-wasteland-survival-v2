@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdir, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import net from 'node:net';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -64,6 +65,30 @@ async function ensureWindowsCloudflaredBinary() {
   }
 
   return cloudflaredBinaryPromise;
+}
+
+function isPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.unref();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+async function findBackendPort(preferredPort = 3000) {
+  const startPort = Number.isFinite(preferredPort) && preferredPort > 0 ? preferredPort : 3000;
+
+  for (let port = startPort; port < startPort + 20; port += 1) {
+    if (await isPortAvailable(port)) {
+      return port;
+    }
+  }
+
+  throw new Error(`no free backend port found near ${startPort}`);
 }
 
 function spawnManaged(command, args, options) {
@@ -284,50 +309,40 @@ async function main() {
   });
 
   logLine('beta', 'starting public tunnels');
-  const streamerTunnelPromise = startCloudflaredTunnel('streamer-tunnel', 'http://localhost:5173');
-  const overlayTunnelPromise = startCloudflaredTunnel('overlay-tunnel', 'http://localhost:5174');
+  const gameClientTunnelPromise = startCloudflaredTunnel('game-client-tunnel', 'http://localhost:5177');
   const viewerTunnelPromise = startCloudflaredTunnel('viewer-tunnel', 'http://localhost:5175');
-  const adminTunnelPromise = startCloudflaredTunnel('admin-tunnel', 'http://localhost:5176');
 
-  const [streamerTunnel, overlayTunnel, viewerTunnel, adminTunnel] = await Promise.all([
-    streamerTunnelPromise,
-    overlayTunnelPromise,
+  const [gameClientTunnel, viewerTunnel] = await Promise.all([
+    gameClientTunnelPromise,
     viewerTunnelPromise,
-    adminTunnelPromise,
   ]);
 
+  const backendPort = await findBackendPort(Number(process.env.BACKEND_PORT ?? '3000'));
+
   const publicEnv = {
-    PUBLIC_STREAMER_BASE_URL: streamerTunnel.url,
-    PUBLIC_OVERLAY_BASE_URL: overlayTunnel.url,
+    PORT: String(backendPort),
+    VITE_BACKEND_TARGET: `http://127.0.0.1:${backendPort}`,
     PUBLIC_VIEWER_BASE_URL: viewerTunnel.url,
   };
 
   logLine('beta', 'starting backend and frontends');
   const backend = startScript('backend', 'backend', 'dev', publicEnv);
-  const streamer = startScript('streamer', 'frontend/streamer', 'dev');
-  const overlay = startScript('overlay', 'frontend/overlay', 'dev');
+  const gameClient = startScript('game-client', 'game-client', 'dev');
   const viewer = startScript('viewer', 'frontend/viewer', 'dev');
-  const admin = startScript('admin', 'frontend/admin', 'dev');
 
   trackProcess('backend', backend);
-  trackProcess('streamer', streamer);
-  trackProcess('overlay', overlay);
+  trackProcess('game-client', gameClient);
   trackProcess('viewer', viewer);
-  trackProcess('admin', admin);
 
   await Promise.all([
-    waitForHttpOk('http://127.0.0.1:3000/health', 'backend health'),
-    waitForHttpOk('http://127.0.0.1:5173/', 'streamer console'),
-    waitForHttpOk('http://127.0.0.1:5174/', 'overlay'),
+    waitForHttpOk(`http://127.0.0.1:${backendPort}/health`, 'backend health'),
+    waitForHttpOk('http://127.0.0.1:5177/', 'game-client'),
     waitForHttpOk('http://127.0.0.1:5175/', 'viewer'),
-    waitForHttpOk('http://127.0.0.1:5176/', 'admin'),
   ]);
 
   const publicTunnelProbes = [
-    { label: 'streamer tunnel', url: streamerTunnel.url },
-    { label: 'overlay tunnel', url: overlayTunnel.url },
+    { label: 'game-client tunnel', url: gameClientTunnel.url },
     { label: 'viewer tunnel', url: viewerTunnel.url },
-    { label: 'admin tunnel', url: adminTunnel.url },
   ];
 
   for (const probe of publicTunnelProbes) {
@@ -345,22 +360,17 @@ async function main() {
     JSON.stringify(
       {
         ok: true,
-        backend: 'http://127.0.0.1:3000',
-        streamer: 'http://127.0.0.1:5173',
-        overlay: 'http://127.0.0.1:5174',
+        backend: `http://127.0.0.1:${backendPort}`,
+        gameClient: 'http://127.0.0.1:5177',
         viewer: 'http://127.0.0.1:5175',
-        admin: 'http://127.0.0.1:5176',
         tunnels: {
-          streamer: streamerTunnel.url,
-          overlay: overlayTunnel.url,
+          gameClient: gameClientTunnel.url,
           viewer: viewerTunnel.url,
-          admin: adminTunnel.url,
         },
         credentials: {
           matt: 'matt / matt-demo-123',
           streamerA: 'streamer_a / streamer-a-123',
           streamerB: 'streamer_b / streamer-b-123',
-          admin: 'admin@example.com / admin-demo-123',
         },
       },
       null,
@@ -368,7 +378,7 @@ async function main() {
     ),
   );
 
-  const monitorChildren = [backend, streamer, overlay, viewer, admin];
+  const monitorChildren = [backend, gameClient, viewer];
   for (const child of monitorChildren) {
     child.once('exit', (code, signal) => {
       if (!shuttingDown) {

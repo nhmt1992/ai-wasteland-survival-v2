@@ -2372,12 +2372,6 @@ export async function loadViewerNpcSnapshot(
   tiktokId: string,
 ): Promise<ViewerNpcSnapshotResult | null> {
   const context = await loadTenantStreamerSubscription(db, handle);
-  const worldSummaries = await loadWorldSummaries(db, context.tenant.id, context.streamer.id);
-  const world = resolvePrimaryWorld(worldSummaries);
-
-  if (!world) {
-    throw notFound(`Streamer ${handle} に world がありません`, { handle });
-  }
 
   const viewerUser = await queryOne<ViewerUserRow>(
     db,
@@ -2440,6 +2434,93 @@ export async function loadViewerNpcSnapshot(
   if (!snapshot) {
     return null;
   }
+
+  return buildViewerNpcSnapshotResult(db, context, snapshot, viewerUser);
+}
+
+export async function loadViewerNpcSnapshotByNpcId(
+  db: SqlExecutor,
+  handle: string,
+  npcId: string,
+): Promise<ViewerNpcSnapshotResult | null> {
+  const context = await loadTenantStreamerSubscription(db, handle);
+
+  const snapshot = await queryOne<NpcRow>(
+    db,
+    `
+      select
+        id,
+        tenant_id,
+        streamer_id,
+        world_id,
+        viewer_user_id,
+        name,
+        age,
+        gender,
+        appearance_key,
+        personality_prompt,
+        backstory,
+        trait_social,
+        trait_aggression,
+        trait_greed,
+        trait_cooperation,
+        trait_risk,
+        trait_leadership,
+        ai_seed,
+        status,
+        death_cause,
+        created_at,
+        updated_at
+      from public.npcs
+      where tenant_id = $1
+        and id = $2
+        and viewer_user_id is not null
+      limit 1
+    `,
+    [context.tenant.id, npcId],
+  );
+
+  if (!snapshot) {
+    return null;
+  }
+
+  if (!snapshot.viewer_user_id) {
+    return null;
+  }
+
+  const viewerUser = ensureNonNull(
+    await queryOne<ViewerUserRow>(
+      db,
+      `
+        select
+          id,
+          tenant_id,
+          streamer_id,
+          tiktok_id,
+          display_name,
+          avatar_url,
+          created_at,
+          updated_at
+        from public.viewer_users
+        where tenant_id = $1
+          and id = $2
+        limit 1
+      `,
+      [context.tenant.id, snapshot.viewer_user_id],
+    ),
+    `Viewer user ${snapshot.viewer_user_id} が見つかりません`,
+  );
+
+  return buildViewerNpcSnapshotResult(db, context, snapshot, viewerUser);
+}
+
+async function buildViewerNpcSnapshotResult(
+  db: SqlExecutor,
+  context: Awaited<ReturnType<typeof loadTenantStreamerSubscription>>,
+  snapshot: NpcRow,
+  viewerUser: ViewerUserRow,
+): Promise<ViewerNpcSnapshotResult> {
+  const world = await loadWorldSnapshotByHandle(db, context.streamer.handle, snapshot.world_id);
 
   const state = ensureNonNull(
     await queryOne<NpcStateRow>(
@@ -2515,14 +2596,14 @@ export async function loadViewerNpcSnapshot(
       order by tick desc, created_at desc
       limit 15
     `,
-    [world.id, snapshot.id],
+    [world.world.id, snapshot.id],
   );
 
   return {
     tenant: context.tenant,
     streamer: context.streamer,
     subscription: context.subscription,
-    world,
+    world: world.world,
     viewerUser,
     npc: {
       npc: snapshot,

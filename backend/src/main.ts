@@ -23,6 +23,7 @@ import {
   loadStreamerContext,
   loadStreamerSessionByTokenHash,
   loadViewerNpcSnapshot,
+  loadViewerNpcSnapshotByNpcId,
   loadLiveSessionById,
   loadWorldSnapshot,
   loadWorldSnapshotByHandle,
@@ -1555,6 +1556,42 @@ app.get('/api/viewer/my-npc', async (request) => {
 
   if (!result) {
     throw notFound('指定された TikTok ID の NPC が見つかりません', query);
+  }
+
+  return {
+    ok: true,
+    tenant: serializeTenant(result.tenant),
+    streamer: serializeStreamer(result.streamer),
+    subscription: serializeSubscription(result.subscription),
+    world: serializeWorld(result.world, result.streamer.handle),
+    viewerUser: {
+      id: result.viewerUser.id,
+      tiktokId: result.viewerUser.tiktok_id,
+      displayName: result.viewerUser.display_name,
+      avatarUrl: result.viewerUser.avatar_url,
+    },
+    npc: serializeNpcSnapshot(result.npc),
+    events: result.events.map(serializeEvent),
+  };
+});
+
+app.get('/api/viewer/watch/:npcId', async (request) => {
+  const params = z
+    .object({
+      npcId: z.string().min(1),
+    })
+    .parse(request.params);
+
+  const query = z
+    .object({
+      streamerHandle: z.string().min(1),
+    })
+    .parse(request.query);
+
+  const result = await loadViewerNpcSnapshotByNpcId(pool, query.streamerHandle, params.npcId);
+
+  if (!result) {
+    throw notFound('指定された NPC が見つかりません', { streamerHandle: query.streamerHandle, npcId: params.npcId });
   }
 
   return {

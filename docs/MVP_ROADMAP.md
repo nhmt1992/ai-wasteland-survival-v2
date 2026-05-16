@@ -2,11 +2,11 @@
 
 ## 1. 开发原则
 
-v2 从第一天开始按多主播 SaaS 设计，但 MVP 只实现一个默认主播租户。
+首发版本先把一个主播的上线闭环做出来。
 
 ```text
-架构多租户。
-功能先单租户。
+底层保留 tenant / streamer / world 上下文。
+功能先单主播可用。
 代码不写死单主播。
 数据表必须有 tenant / streamer / world 上下文。
 ```
@@ -22,10 +22,8 @@ AGENTS.md
 CODEX_TASKS.md
 .env.example
 docker-compose.yml
-package.json
 backend skeleton
-frontend/streamer skeleton
-frontend/overlay skeleton
+game-client skeleton
 frontend/viewer skeleton
 supabase/schema.sql
 ```
@@ -33,18 +31,20 @@ supabase/schema.sql
 验收：
 
 ```text
-仓库结构完整。
-Codex 能按任务继续开发。
+npm install 成功。
+docker compose up 成功。
+backend /health 成功。
+game-client 可启动。
+viewer 可启动。
 ```
 
-## Phase 1：多租户数据库与种子数据
+## Phase 1：单主播数据库与种子数据
 
 交付：
 
 ```text
 tenants
 streamers
-streamer_subscriptions
 worlds
 live_sessions
 viewer_users
@@ -129,52 +129,30 @@ NPC 可能陷入危险或死亡。
 事件日志可解释行为。
 ```
 
-## Phase 4：Streamer Console MVP
+## Phase 4：Streamer Game Client MVP
 
 交付：
 
 ```text
-默认主播 Dashboard
-世界列表
-当前 live session
-礼物连接状态
-NPC 危机榜
-Overlay 链接
-用户创建链接
-```
-
-验收：
-
-```text
-主播能看到自己的世界。
-主播能复制 Overlay URL。
-主播能复制用户创建链接。
-主播能看到 NPC 危机榜。
-```
-
-## Phase 5：Overlay MVP
-
-交付：
-
-```text
-1920×1080 OBS 页面
-2.5D 世界占位渲染
+主播窗口游戏画面
+世界快照渲染
 NPC 显示
-NPC 状态条
-事件日志
-礼物特效占位
+礼物反馈显示
+危机事件显示
 世界时间
-生存者数量
+窗口采集建议
 ```
 
 验收：
 
 ```text
-OBS Browser Source 可打开。
-主播直播画面能看懂 NPC 状态和事件。
+主播能打开 game-client。
+主播能看到自己的世界。
+主播能看到模拟礼物反馈。
+主播能围绕 NPC 事件讲故事。
 ```
 
-## Phase 6：Viewer / Creator MVP
+## Phase 5：Viewer / Creator MVP
 
 交付：
 
@@ -197,7 +175,7 @@ NPC 自动进入主播世界。
 用户只能查看自己的 NPC。
 ```
 
-## Phase 7：模拟礼物闭环
+## Phase 6：模拟礼物闭环
 
 交付：
 
@@ -208,7 +186,7 @@ GiftEvent 标准化
 ResourceGrant 生成
 补给箱投放
 NPC 自主拾取
-Overlay 礼物事件显示
+礼物反馈显示
 ```
 
 验收：
@@ -217,10 +195,9 @@ Overlay 礼物事件显示
 模拟礼物能进入正确主播世界。
 礼物能找到对应 TikTok ID 的 NPC。
 资源箱能生成并被 NPC 拾取。
-Overlay 显示支援事件。
 ```
 
-## Phase 8：首次主播演示
+## Phase 7：首发演示
 
 配置：
 
@@ -228,7 +205,7 @@ Overlay 显示支援事件。
 1 默认主播
 1 默认世界
 5-10 NPC
-1 OBS Overlay
+1 game-client
 1 Viewer / Creator 链接
 模拟礼物
 1 小时运行
@@ -238,19 +215,19 @@ Overlay 显示支援事件。
 
 ```text
 系统 1 小时不崩。
-主播能讲故事。
-用户端流程可用。
+主播能看懂世界。
+观众端流程可用。
 礼物支援反馈清晰。
 ```
 
-## 暂不开发
+## Phase 8：后续再做
 
 ```text
-真实 Stripe 收费
-真实 TikTok 礼物接入
-多个正式主播注册
-公共大世界
-复杂部落政治
-移动 App
-AWS 生产部署
+Streamer Console
+OBS Overlay
+Admin Console
+订阅与套餐
+多主播注册
+团队权限
+更完整的数据分析
 ```

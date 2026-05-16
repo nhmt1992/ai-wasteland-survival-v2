@@ -1,15 +1,16 @@
 # CODEX_TASKS.md
 
-本文件指导 Codex 按 v2 多主播 SaaS 架构开发。
+本文件指导 Codex 按先上线闭环推进开发。
 
 ## 当前总原则
 
 ```text
-架构多租户，功能先单租户。
+架构保留 tenant / streamer / world 上下文。
+首发先做单主播可用闭环，不先做完整多主播 SaaS。
 MVP 使用默认主播 matt 和默认世界。
 所有核心 API 必须带 streamer / world 上下文。
 真实 TikTok 和 Stripe 后置。
-先做模拟礼物和 1 小时世界运行。
+先做模拟礼物、game-client 和 1 小时世界运行。
 ```
 
 ---
@@ -25,8 +26,7 @@ MVP 使用默认主播 matt 和默认世界。
 - [ ] .env.example
 - [ ] docker-compose.yml
 - [ ] backend/package.json
-- [ ] frontend/streamer/package.json
-- [ ] frontend/overlay/package.json
+- [ ] game-client/package.json
 - [ ] frontend/viewer/package.json
 
 验收：
@@ -35,7 +35,8 @@ MVP 使用默认主播 matt 和默认世界。
 npm install 成功。
 docker compose up 成功。
 backend /health 成功。
-三个前端 dev server 可启动。
+game-client 可启动。
+viewer dev server 可启动。
 ```
 
 ---
@@ -112,40 +113,21 @@ backend /health 成功。
 
 ---
 
-## Phase 5：Streamer Console MVP
+## Phase 5：game-client MVP
 
-- [ ] Dashboard 页面。
-- [ ] 显示默认主播信息。
-- [ ] 显示订阅状态。
-- [ ] 显示世界列表。
-- [ ] 显示当前 live session。
-- [ ] 显示 Overlay URL。
-- [ ] 显示用户创建链接。
-- [ ] 显示 NPC 危机榜。
-- [ ] 显示最近礼物事件。
+- [ ] 主播窗口游戏画面。
+- [ ] 世界快照渲染。
+- [ ] NPC 显示。
+- [ ] 礼物反馈显示。
+- [ ] 危机事件显示。
+- [ ] 世界时间显示。
+- [ ] 窗口采集说明。
 
 UI：日文。
 
 ---
 
-## Phase 6：OBS Overlay MVP
-
-- [ ] 1920×1080 页面。
-- [ ] PixiJS 初始化。
-- [ ] 2.5D 坐标转换。
-- [ ] 显示 64×64 世界。
-- [ ] 显示 NPC。
-- [ ] 显示 NPC 名字和状态条。
-- [ ] 显示世界时间。
-- [ ] 显示生存者 / 死亡者。
-- [ ] 显示事件日志。
-- [ ] 显示礼物特效占位。
-
-UI：日文。
-
----
-
-## Phase 7：Viewer / Creator MVP
+## Phase 6：Viewer / Creator MVP
 
 - [ ] `/s/:streamerHandle/create`
 - [ ] TikTok ID 输入。
@@ -161,6 +143,27 @@ UI：日文。
 
 ---
 
+## Phase 7：模拟礼物闭环
+
+- [ ] DevMockGiftAdapter 流程打通。
+- [ ] ManualGiftAdapter 流程打通。
+- [ ] GiftEvent 标准化。
+- [ ] ResourceGrant 生成。
+- [ ] 补给箱投放。
+- [ ] NPC 自主拾取。
+- [ ] game-client 显示支援事件。
+
+验收：
+
+```text
+模拟礼物能进入正确主播世界。
+礼物能找到对应 TikTok ID 的 NPC。
+资源箱能生成并被 NPC 拾取。
+game-client 显示支援事件。
+```
+
+---
+
 ## Phase 8：首次演示
 
 配置：
@@ -171,7 +174,7 @@ UI：日文。
 5-10 NPC
 模拟礼物
 1 小时运行
-OBS Overlay 可展示
+game-client 可展示
 用户端可创建 NPC
 ```
 

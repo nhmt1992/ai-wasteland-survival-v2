@@ -4,13 +4,14 @@
 
 ## 1. 项目定位
 
-本仓库是 AI Wasteland Survival v2：多主播 SaaS 版 AI-NPC 荒土生存直播平台。
+本仓库是 AI Wasteland Survival v2 的先上线版本：先做单主播可用闭环，再保留未来扩展为多主播 SaaS 的空间。
 
 开发时必须牢记：
 
 ```text
-这不是单主播直播工具。
-这是面向多个 TikTok 主播的 SaaS 平台。
+这不是只做演示页的单机玩具。
+当前首发目标是先把一个主播的直播闭环做上线。
+未来仍然可以扩展为面向多个 TikTok 主播的 SaaS 平台。
 ```
 
 ## 2. 语言规则
@@ -82,12 +83,11 @@ CODEX_TASKS.md
 当前优先：
 
 ```text
-多租户数据库
+可上线的单主播数据模型
 默认主播 / 默认世界种子数据
 Backend API MVP
 World Tick Engine
-Streamer Console MVP
-Overlay MVP
+game-client 主播画面
 Viewer / Creator MVP
 模拟礼物闭环
 ```

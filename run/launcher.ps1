@@ -3,6 +3,42 @@ Add-Type -AssemblyName System.Drawing
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
+function Test-PortAvailable {
+  param([int]$Port)
+
+  $listener = $null
+  try {
+    $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $Port)
+    $listener.Start()
+    return $true
+  } catch {
+    return $false
+  } finally {
+    if ($null -ne $listener) {
+      try {
+        $listener.Stop()
+      } catch {
+        # Ignore cleanup failures.
+      }
+    }
+  }
+}
+
+function Get-FreeBackendPort {
+  param([int]$PreferredPort = 3000)
+
+  for ($port = $PreferredPort; $port -lt ($PreferredPort + 20); $port++) {
+    if (Test-PortAvailable -Port $port) {
+      return $port
+    }
+  }
+
+  throw "无法找到可用的后端端口（从 $PreferredPort 开始）"
+}
+
+$backendPort = Get-FreeBackendPort
+$backendTarget = "http://127.0.0.1:$backendPort"
+
 $serviceDefinitions = @(
   [pscustomobject]@{
     Key = 'backend'
@@ -10,6 +46,7 @@ $serviceDefinitions = @(
     Command = 'npm run dev:backend'
     WindowTitle = 'AI Wasteland Survival v2 - 后端'
     Description = '服务端、世界状态、Tick、礼物事件'
+    Role = 'backend'
   },
   [pscustomobject]@{
     Key = 'game'
@@ -17,6 +54,7 @@ $serviceDefinitions = @(
     Command = 'npm run dev:game'
     WindowTitle = 'AI Wasteland Survival v2 - game-client'
     Description = '主播窗口 2.5D 游戏画面'
+    Role = 'frontend'
   },
   [pscustomobject]@{
     Key = 'streamer'
@@ -24,6 +62,7 @@ $serviceDefinitions = @(
     Command = 'npm run dev:streamer'
     WindowTitle = 'AI Wasteland Survival v2 - 主播端'
     Description = '主播控制台'
+    Role = 'frontend'
   },
   [pscustomobject]@{
     Key = 'overlay'
@@ -31,6 +70,7 @@ $serviceDefinitions = @(
     Command = 'npm run dev:overlay'
     WindowTitle = 'AI Wasteland Survival v2 - Overlay'
     Description = 'OBS 叠层界面'
+    Role = 'frontend'
   },
   [pscustomobject]@{
     Key = 'viewer'
@@ -38,6 +78,7 @@ $serviceDefinitions = @(
     Command = 'npm run dev:viewer'
     WindowTitle = 'AI Wasteland Survival v2 - 用户端'
     Description = '观众创建与查看页面'
+    Role = 'frontend'
   },
   [pscustomobject]@{
     Key = 'admin'
@@ -45,6 +86,7 @@ $serviceDefinitions = @(
     Command = 'npm run dev:admin'
     WindowTitle = 'AI Wasteland Survival v2 - 管理端'
     Description = '平台管理控制台'
+    Role = 'frontend'
   }
 )
 
@@ -111,7 +153,9 @@ function Start-ServiceWindow {
   $definition = $state.Definition
   $rootLiteral = $repoRoot.Replace("'", "''")
   $titleLiteral = $definition.WindowTitle.Replace("'", "''")
-  $command = "`$Host.UI.RawUI.WindowTitle = '$titleLiteral'; Set-Location -LiteralPath '$rootLiteral'; $($definition.Command)"
+  $sharedEnv = "`$env:VITE_BACKEND_TARGET = '$backendTarget'; "
+  $backendEnv = if ($definition.Role -eq 'backend') { "`$env:PORT = '$backendPort'; " } else { '' }
+  $command = "`$Host.UI.RawUI.WindowTitle = '$titleLiteral'; $backendEnv$sharedEnv Set-Location -LiteralPath '$rootLiteral'; $($definition.Command)"
 
   try {
     $state.Process = Start-Process -FilePath 'powershell.exe' -WindowStyle Normal -WorkingDirectory $repoRoot -ArgumentList @(
@@ -330,7 +374,7 @@ $form.Controls.Add($footer)
 
 $footerLabel = New-Object System.Windows.Forms.Label
 $footerLabel.Dock = 'Fill'
-$footerLabel.Text = "项目根目录：$repoRoot"
+$footerLabel.Text = "项目根目录：$repoRoot  |  后端端口：$backendPort"
 $footerLabel.ForeColor = [System.Drawing.Color]::FromArgb(190, 180, 170)
 $footer.Controls.Add($footerLabel)
 

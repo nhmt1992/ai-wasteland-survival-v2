@@ -15,6 +15,7 @@
     "phase11:verify": "tsx scripts/verify-phase11.ts",
     "phase12:verify": "tsx scripts/verify-phase12.ts",
     "phase15:verify": "npm run db:init && tsx scripts/verify-phase15.ts",
+    "verify:viewer-watch": "npm run db:init && tsx scripts/verify-viewer-watch.ts",
     "verify:tick-transaction": "npm run db:init && tsx scripts/verify-tick-transaction.ts"
   },
   "dependencies": {

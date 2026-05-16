@@ -1,37 +1,34 @@
 # AI Wasteland Survival v2
 
-AI Wasteland Survival v2 是一个面向多个 TikTok 主播的 SaaS 版 AI-NPC 荒土生存直播平台。
+AI Wasteland Survival v2 先做的是一个可上线的 AI-NPC 荒土生存直播闭环。
 
-这不是单主播直播工具。
-这是一个支持 `tenant / streamer / world` 上下文的多租户平台：服务端维护世界状态，主播端负责操控与观测，观众端负责创建和绑定自己的 AI-NPC，OBS Overlay 负责直播叠层，`game-client` 负责主播窗口里的 2.5D 游戏画面。
+这不是只做演示页的单机玩具。
+首发版本先围绕一个主播、一张世界、一套观众创建 NPC 的闭环上线；底层仍保留 `tenant / streamer / world` 上下文，方便后续再扩成多主播 SaaS。
 
 ## 当前状态
 
-- 多租户数据库和默认种子数据已落地。
-- 主播登录、HttpOnly session、世界 Tick、礼物 Adapter、套餐限制、Admin Console、Billing Mock 已可运行。
-- Overlay 已完成视觉升级，朝着“荒土末日 × 2.5D 等距 × 高清像素风 × 直播强化 UI”方向推进。
-- `game-client/` 已完成首版 workspace，并在继续迭代为主播窗口用的 2.5D 游戏画面客户端。
-- 当前开发重点是多主播 SaaS 架构下的 MVP 完整闭环，而不是单世界演示页。
+- 数据层已经预留多租户上下文，但首发只跑默认主播和默认世界。
+- Backend、World Tick、礼物 Adapter、Viewer 创建链路、`game-client` 主播画面是当前重点。
+- `game-client/` 已完成首版 workspace，定位为主播窗口里的 2.5D 游戏画面和礼物反馈界面。
+- 现在优先保证“能上线、能直播、能创建、能观看”的闭环，而不是把 SaaS 账单、团队和多主播权限先做完。
 
 ## 一句话定位
 
 ```text
-给 TikTok 主播使用的 AI-NPC 生存直播互动 SaaS。
+给 TikTok 主播使用的 AI-NPC 生存直播互动系统。
 ```
 
 ## 产品边界
 
 ### 要做
 
-- 多租户数据库
+- 可上线的单主播数据模型
 - 默认主播 / 默认世界种子数据
 - Backend API MVP
 - World Tick Engine
-- Streamer Console MVP
-- OBS Overlay MVP
+- `game-client` 主播窗口游戏画面
 - Viewer / Creator MVP
 - 模拟礼物闭环
-- `game-client` 2.5D 主播窗口游戏客户端
 - `run/launcher` 图形化窗口启动器
 
 ### 不做
@@ -43,6 +40,7 @@ AI Wasteland Survival v2 是一个面向多个 TikTok 主播的 SaaS 版 AI-NPC 
 - 复杂分账
 - 移动 App
 - AWS 生产部署
+- 先做完整 SaaS 套餐和团队权限
 
 ## 架构原则
 
@@ -81,17 +79,13 @@ docs/                 设计与规格文档
 
 ## 已交付能力
 
-- 多租户数据库与默认种子数据
+- 默认主播 / 默认世界数据
 - 主播登录与 HttpOnly session
 - 真实 PostgreSQL API
 - World Tick Engine
-- Streamer Console
-- OBS Overlay
 - Viewer / Creator
-- Admin Console
+- 观众公开观看页 `/s/:streamerHandle/watch/:npcId`
 - 模拟礼物 Adapter
-- 套餐限制系统
-- Billing Mock
 - Cloudflare Quick Tunnel 演示
 - `game-client` WebGL 画面客户端
 
@@ -182,7 +176,7 @@ npm --workspace game-client run build
 | 主播窗口游戏客户端 | Vite + TypeScript + PixiJS 8 |
 | 状态管理 | Zustand |
 | 管理端 | Vite + React + TypeScript |
-| 订阅收费 | Stripe Billing Mock / 预留真实接入 |
+| 订阅收费 | 后置 |
 | 本地演示 | Docker Compose + Cloudflare Tunnel |
 
 ## 本地启动
@@ -193,10 +187,7 @@ npm install
 docker compose up
 npm run dev:backend
 npm run dev:game
-npm run dev:streamer
-npm run dev:overlay
 npm run dev:viewer
-npm run dev:admin
 ```
 
 ## Beta 演示
@@ -205,7 +196,8 @@ npm run dev:admin
 npm run beta:demo
 ```
 
-这个脚本会重置数据库、启动 backend / streamer / overlay / viewer / admin、拉起 Cloudflare Quick Tunnel，并打印可直接演示的外网地址。流程说明见 [docs/BETA_RUNBOOK.md](docs/BETA_RUNBOOK.md)。
+这个脚本会重置数据库、启动 backend / game-client / viewer、拉起 Cloudflare Quick Tunnel，并打印可直接演示的外网地址。
+如果本机 `3000` 被占用，它会自动选择可用后端端口并同步调整前端代理目标。流程说明见 [docs/BETA_RUNBOOK.md](docs/BETA_RUNBOOK.md)。
 
 ## 验证命令
 
@@ -221,26 +213,27 @@ npm run phase12:verify
 npm run phase13:verify
 npm run phase15:verify
 npm run verify:tick-transaction
+npm run verify:viewer-watch
 ```
 
-其中 `npm run verify:tick-transaction` 用来覆盖礼物补给箱拾取与 Tick 事务回滚的关键闭环。
+其中 `npm run verify:tick-transaction` 用来覆盖礼物补给箱拾取与 Tick 事务回滚的关键闭环，`npm run verify:viewer-watch` 用来覆盖按 `npcId` 的公开观看页与跨租户隔离。
 
 ## Cloudflare Tunnel 本地外网测试
 
 ```text
-1. 先启动 backend 与各个前端 dev server。
-2. 将 `.env` 里的 `PUBLIC_STREAMER_BASE_URL` / `PUBLIC_OVERLAY_BASE_URL` / `PUBLIC_VIEWER_BASE_URL` / `PUBLIC_ADMIN_BASE_URL` 改成对应外网地址。
-3. 分别执行 `npm run tunnel:streamer`、`npm run tunnel:overlay`、`npm run tunnel:viewer`、`npm run tunnel:admin`。
+1. 先启动 backend 与当前要上线的前端 dev server。
+2. 将 `.env` 里的 `PUBLIC_VIEWER_BASE_URL` 和 `PUBLIC_GAME_CLIENT_BASE_URL` 改成对应外网地址。
+3. 先执行 `npm run tunnel:viewer`，`game-client` 继续用本地窗口或单独外网地址验收。
 4. 外网浏览器访问 tunnel URL，前端会通过同源 `/api` 代理读取本地后端。
 ```
 
 ## 文档入口
 
 - [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_STRATEGY.md)：产品与商业模式
-- [docs/SAAS_ARCHITECTURE.md](docs/SAAS_ARCHITECTURE.md)：多主播 SaaS 架构
+- [docs/SAAS_ARCHITECTURE.md](docs/SAAS_ARCHITECTURE.md)：先上线架构与未来多主播扩展
 - [docs/MULTI_TENANT_MODEL.md](docs/MULTI_TENANT_MODEL.md)：多租户模型
-- [docs/THREE_CLIENTS_SPEC.md](docs/THREE_CLIENTS_SPEC.md)：服务端、直播端、用户端职责
-- [docs/STREAMER_CONSOLE_SPEC.md](docs/STREAMER_CONSOLE_SPEC.md)：主播端功能规划
+- [docs/THREE_CLIENTS_SPEC.md](docs/THREE_CLIENTS_SPEC.md)：服务端、主播画面端、用户端职责
+- [docs/STREAMER_CONSOLE_SPEC.md](docs/STREAMER_CONSOLE_SPEC.md)：主播控制台后续功能规划
 - [docs/GIFT_ADAPTER_SPEC.md](docs/GIFT_ADAPTER_SPEC.md)：礼物接入 Adapter 规范
 - [docs/AI_NPC_ENGINE_SPEC.md](docs/AI_NPC_ENGINE_SPEC.md)：AI-NPC 行为系统
 - [docs/MVP_ROADMAP.md](docs/MVP_ROADMAP.md)：开发路线图
@@ -268,7 +261,7 @@ npm run verify:tick-transaction
 ## 当前阶段
 
 ```text
-Phase 15 / Billing Mock + Visual Upgrade Track
+Phase 2 / Backend + game-client + Viewer Launch Track
 ```
 
-当前正在持续推进 `game-client` 的角色轮廓分型、HUD 收敛和 2.5D 游戏感增强。
+当前正在持续推进后端闭环、`game-client` 主播画面和观众创建 / 观看链路。

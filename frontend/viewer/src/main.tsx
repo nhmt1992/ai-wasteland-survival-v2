@@ -154,8 +154,9 @@ type CreateNpcResponse = {
 };
 
 type ViewerRoute = {
-  page: 'create' | 'my-npc';
+  page: 'create' | 'my-npc' | 'watch';
   streamerHandle: string;
+  npcId?: string;
 };
 type RealtimeMessage = {
   type: string;
@@ -277,13 +278,24 @@ function formatPlanLabel(plan: string | null | undefined): string {
   }
 }
 
+function buildWatchUrl(streamerHandle: string, npcId: string): string {
+  return `${window.location.origin}/s/${encodeURIComponent(streamerHandle)}/watch/${encodeURIComponent(npcId)}`;
+}
+
 function resolveRoute(): ViewerRoute {
   const parts = window.location.pathname.split('/').filter(Boolean);
 
   if (parts[0] === 's' && parts[1]) {
     const streamerHandle = parts[1].trim();
-    const page = parts[2] === 'my-npc' ? 'my-npc' : 'create';
-    return { page, streamerHandle };
+    if (parts[2] === 'my-npc') {
+      return { page: 'my-npc', streamerHandle };
+    }
+
+    if (parts[2] === 'watch' && parts[3]) {
+      return { page: 'watch', streamerHandle, npcId: parts[3].trim() };
+    }
+
+    return { page: 'create', streamerHandle };
   }
 
   return { page: 'create', streamerHandle: '' };
@@ -436,6 +448,19 @@ function App() {
     );
   }
 
+  if (route.page === 'watch') {
+    return (
+      <WatchNpcPage
+        route={route}
+        initialNpcId={route.npcId ?? ''}
+        context={streamer.context}
+        loading={streamer.loading}
+        error={streamer.error}
+        reloadContext={streamer.reload}
+      />
+    );
+  }
+
   return <CreatePage route={route} context={streamer.context} loading={streamer.loading} error={streamer.error} reloadContext={streamer.reload} />;
 }
 
@@ -446,7 +471,7 @@ function CreatePage({
   error,
   reloadContext,
 }: {
-  route: { page: 'create' | 'my-npc'; streamerHandle: string };
+  route: ViewerRoute;
   context: StreamerContext | null;
   loading: boolean;
   error: string | null;
@@ -741,7 +766,7 @@ function MyNpcPage({
   error,
   reloadContext,
 }: {
-  route: { page: 'create' | 'my-npc'; streamerHandle: string };
+  route: ViewerRoute;
   initialTiktokId: string;
   context: StreamerContext | null;
   loading: boolean;
@@ -868,6 +893,13 @@ function MyNpcPage({
             <strong>{realtimeStatus === 'connected' ? '接続中' : realtimeStatus === 'reconnecting' ? '再接続中' : realtimeStatus === 'connecting' ? '接続中' : '待機中'}</strong>
             <span className="metric-sub">WebSocket / world 更新</span>
           </div>
+          {snapshot ? (
+            <div className="metric">
+              <span className="metric-label">公開視聴 URL</span>
+              <strong>{buildWatchUrl(route.streamerHandle, snapshot.npc.id)}</strong>
+              <span className="metric-sub">この URL を共有すると NPC を直接見られます。</span>
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -902,6 +934,304 @@ function MyNpcPage({
             {snapshot ? `最終更新 ${formatDateTime(snapshot.npc.updatedAt)}` : 'TikTok ID を入れると現在状態を取得します。'}
           </div>
         </form>
+
+        <section className="panel info-panel">
+          <header className="section-head">
+            <div>
+              <h2>NPC 概要</h2>
+              <p>現在の体調、行動、位置をまとめています。</p>
+            </div>
+          </header>
+
+          {snapshot ? (
+            <div className="profile-grid">
+              <div className="metric profile-card">
+                <span className="metric-label">名前</span>
+                <strong>{snapshot.npc.name}</strong>
+                <span className="metric-sub">{snapshot.npc.gender ?? '—'} / {snapshot.npc.age} 歳</span>
+              </div>
+              <div className="metric profile-card">
+                <span className="metric-label">状態</span>
+                <strong>{snapshot.npc.status}</strong>
+                <span className="metric-sub">{snapshot.npc.deathCause ?? snapshot.npc.state.currentAction}</span>
+              </div>
+              <div className="metric profile-card">
+                <span className="metric-label">座標</span>
+                <strong>{snapshot.npc.state.tileX}, {snapshot.npc.state.tileY}</strong>
+                <span className="metric-sub">最後の Tick {formatNumber(snapshot.npc.state.lastTick)}</span>
+              </div>
+              <div className="metric profile-card">
+                <span className="metric-label">入力済み TikTok ID</span>
+                <strong>{snapshot.viewerUser.tiktokId}</strong>
+                <span className="metric-sub">{snapshot.viewerUser.displayName ?? '—'}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="empty-state">まだ NPC は表示されていません。</div>
+          )}
+
+          {snapshot ? (
+            <div className="state-grid">
+              <StatCard label="HP" value={snapshot.npc.state.hp} />
+              <StatCard label="水" value={snapshot.npc.state.water} />
+              <StatCard label="食料" value={snapshot.npc.state.food} />
+              <StatCard label="スタミナ" value={snapshot.npc.state.stamina} />
+              <StatCard label="士気" value={snapshot.npc.state.morale} />
+              <StatCard label="傷" value={snapshot.npc.state.injury} />
+              <StatCard label="防護" value={snapshot.npc.state.shelter} />
+            </div>
+          ) : null}
+        </section>
+      </section>
+
+      {snapshot ? (
+        <section className="layout lower">
+          <section className="panel">
+            <header className="section-head">
+              <div>
+                <h2>所持品</h2>
+                <p>生存に必要な物資をそのまま表示しています。</p>
+              </div>
+            </header>
+            <div className="inventory-list">
+              {inventory.length > 0 ? (
+                inventory.map((item) => (
+                  <article key={item.id} className="inventory-row">
+                    <strong>{item.itemId}</strong>
+                    <span>数量 {formatNumber(item.quantity)}</span>
+                    <small>{item.durability !== null ? `耐久 ${item.durability}` : '消耗品'}</small>
+                  </article>
+                ))
+              ) : (
+                <div className="empty-state">所持品はまだありません。</div>
+              )}
+            </div>
+          </section>
+
+          <section className="panel">
+            <header className="section-head">
+              <div>
+                <h2>最近の出来事</h2>
+                <p>world_events の最新状態です。</p>
+              </div>
+            </header>
+            <div className="event-list">
+              {events.length > 0 ? (
+                events.map((event) => (
+                  <article key={event.id} className="event-row">
+                    <span className="event-badge">Tick {formatNumber(event.tick)}</span>
+                    <strong>{event.titleJa ?? event.eventType}</strong>
+                    <p>{event.descriptionJa ?? '—'}</p>
+                    <small>{formatDateTime(event.createdAt)}</small>
+                  </article>
+                ))
+              ) : (
+                <div className="empty-state">出来事はまだありません。</div>
+              )}
+            </div>
+          </section>
+
+          <section className="panel">
+            <header className="section-head">
+              <div>
+                <h2>性格と背景</h2>
+                <p>作成時に入力された Prompt をそのまま表示しています。</p>
+              </div>
+            </header>
+            <div className="detail-stack">
+              <div className="detail-item">
+                <span>性格・背景</span>
+                <p>{snapshot.npc.personalityPrompt || '—'}</p>
+              </div>
+              <div className="detail-item">
+                <span>バックストーリー</span>
+                <p>{snapshot.npc.backstory || '—'}</p>
+              </div>
+              <div className="detail-item">
+                <span>特性</span>
+                <p>
+                  社交 {snapshot.npc.traits.social} / 協調 {snapshot.npc.traits.cooperation} / 危険 {snapshot.npc.traits.risk}
+                </p>
+              </div>
+            </div>
+          </section>
+        </section>
+      ) : null}
+    </main>
+  );
+}
+
+function WatchNpcPage({
+  route,
+  initialNpcId,
+  context,
+  loading,
+  error,
+  reloadContext,
+}: {
+  route: ViewerRoute;
+  initialNpcId: string;
+  context: StreamerContext | null;
+  loading: boolean;
+  error: string | null;
+  reloadContext: () => Promise<void>;
+}) {
+  const [snapshot, setSnapshot] = useState<ViewerSnapshotResponse | null>(null);
+  const [snapshotLoading, setSnapshotLoading] = useState(Boolean(initialNpcId));
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
+  const routeError = route.streamerHandle ? null : '配信者 URL が必要です。';
+  const activeWorldId = snapshot?.world.id ?? context?.primaryWorld?.id ?? '';
+  const watchUrl = route.npcId ? buildWatchUrl(route.streamerHandle, route.npcId) : null;
+
+  const loadSnapshot = useCallback(async (npcId: string) => {
+    if (routeError) {
+      setSnapshot(null);
+      setSnapshotError(routeError);
+      setSnapshotLoading(false);
+      return;
+    }
+
+    if (!npcId.trim()) {
+      setSnapshot(null);
+      setSnapshotError('NPC ID が必要です。/s/{streamerHandle}/watch/{npcId} を開いてください。');
+      setSnapshotLoading(false);
+      return;
+    }
+
+    setSnapshotLoading(true);
+    try {
+      const data = await requestJson<ViewerSnapshotResponse>(
+        `/api/viewer/watch/${encodeURIComponent(npcId.trim())}?streamerHandle=${encodeURIComponent(route.streamerHandle)}`,
+      );
+      setSnapshot(data);
+      setSnapshotError(null);
+    } catch (loadError) {
+      setSnapshot(null);
+      setSnapshotError(loadError instanceof Error ? loadError.message : 'watch ページの取得に失敗しました');
+    } finally {
+      setSnapshotLoading(false);
+    }
+  }, [route.streamerHandle, routeError]);
+
+  useEffect(() => {
+    void loadSnapshot(initialNpcId);
+  }, [initialNpcId, loadSnapshot]);
+
+  useEffect(() => {
+    if (!snapshot?.npc.id || !route.npcId) {
+      return;
+    }
+
+    const timer = window.setInterval(() => {
+      void loadSnapshot(route.npcId ?? '');
+    }, 8000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [loadSnapshot, route.npcId, snapshot?.npc.id]);
+
+  const realtimeStatus = useRealtimeFeed(route.streamerHandle, activeWorldId, () => {
+    void reloadContext();
+    void loadSnapshot(route.npcId ?? '');
+  });
+
+  const traits = snapshot?.npc.traits;
+  const inventory = snapshot?.npc.inventory ?? [];
+  const events = snapshot?.events ?? [];
+
+  const handleReload = () => {
+    void loadSnapshot(route.npcId ?? '');
+  };
+
+  return (
+    <main className="viewer-shell">
+      <header className="topbar">
+        <div className="brand">
+          <strong>AI WASTELAND SURVIVAL v2</strong>
+          <span>Watch NPC</span>
+        </div>
+        <div className="actions">
+          <a className="action" href={`/s/${route.streamerHandle}/create`}>
+            新しく作成
+          </a>
+          <a className="action" href={snapshot?.viewerUser?.tiktokId ? `/s/${route.streamerHandle}/my-npc?tiktokId=${encodeURIComponent(snapshot.viewerUser.tiktokId)}` : `/s/${route.streamerHandle}/my-npc`}>
+            自分の NPC
+          </a>
+          <a
+            className="action primary"
+            href={route.streamerHandle && activeWorldId ? `/overlay/${route.streamerHandle}/${activeWorldId}` : '#'}
+            aria-disabled={!route.streamerHandle || !activeWorldId}
+          >
+            Overlay を確認
+          </a>
+        </div>
+      </header>
+
+      <section className="hero panel">
+        <div className="hero-copy">
+          <p className="eyebrow">公開視聴ページ</p>
+          <h1>{snapshot?.npc.name ?? 'NPC を読み込み中'}</h1>
+          <p>
+            NPC ID {route.npcId || '未入力'} の公開視聴ページです。状態、所持品、最近の出来事をそのまま確認できます。
+          </p>
+        </div>
+        <div className="hero-side">
+          <div className="metric">
+            <span className="metric-label">配信者</span>
+            <strong>{(snapshot?.streamer.displayName ?? context?.streamer.displayName ?? route.streamerHandle) || '—'}</strong>
+            <span className="metric-sub">@{route.streamerHandle}</span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">ワールド</span>
+            <strong>{snapshot?.world.name ?? context?.primaryWorld?.name ?? '荒土世界 Alpha'}</strong>
+            <span className="metric-sub">Tick {snapshot?.world.currentTick ?? context?.primaryWorld?.currentTick ?? '—'}</span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">リアルタイム</span>
+            <strong>{realtimeStatus === 'connected' ? '接続中' : realtimeStatus === 'reconnecting' ? '再接続中' : realtimeStatus === 'connecting' ? '接続中' : '待機中'}</strong>
+            <span className="metric-sub">WebSocket / world 更新</span>
+          </div>
+        </div>
+      </section>
+
+      {(error || snapshotError) ? <section className="alert">{error ?? snapshotError}</section> : null}
+
+      <section className="layout">
+        <section className="panel form-panel">
+          <header className="section-head">
+            <div>
+              <h2>公開リンク</h2>
+              <p>このページは NPC ID を使って直接開きます。</p>
+            </div>
+            <span className="status-chip">{snapshotLoading ? '読込中' : '表示'}</span>
+          </header>
+
+          <div className="detail-stack">
+            <div className="detail-item">
+              <span>公開視聴 URL</span>
+              <p>{watchUrl ?? '—'}</p>
+            </div>
+            <div className="detail-item">
+              <span>本人用ページ</span>
+              <p>{snapshot?.viewerUser?.tiktokId ? `/s/${route.streamerHandle}/my-npc?tiktokId=${snapshot.viewerUser.tiktokId}` : `/s/${route.streamerHandle}/my-npc`}</p>
+            </div>
+            <div className="detail-item">
+              <span>現在の状態</span>
+              <p>{snapshot ? `${snapshot.npc.status} / ${snapshot.npc.state.currentAction}` : '—'}</p>
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button className="action primary" type="button" onClick={handleReload} disabled={!route.npcId}>
+              更新
+            </button>
+          </div>
+
+          <div className="helper">
+            {snapshot ? `最終更新 ${formatDateTime(snapshot.npc.updatedAt)}` : 'NPC ID を開くと現在状態を取得します。'}
+          </div>
+        </section>
 
         <section className="panel info-panel">
           <header className="section-head">

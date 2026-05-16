@@ -2,12 +2,12 @@
 
 ## 1. 三端定义
 
-v2 系统由三类入口组成：
+首发版本由三类入口组成：
 
 ```text
 Platform Server：服务端，平台核心系统。
-Streamer Console：直播端，主播工作台。
-Viewer / Creator：用户端，观众创建和观看 NPC。
+game-client：主播窗口游戏画面与礼物反馈。
+Viewer / Creator：用户端，观众创建和观看自己的 NPC。
 ```
 
 ## 2. 服务端 Platform Server
@@ -17,9 +17,6 @@ Viewer / Creator：用户端，观众创建和观看 NPC。
 职责：
 
 ```text
-多租户管理
-主播账号
-订阅状态
 世界运行
 Tick Engine
 NPC 行为
@@ -33,83 +30,38 @@ WebSocket 推送
 
 ```text
 Auth
-Tenant
-Streamer
-Billing
 World
 NPC
 Gift
 LiveSession
-OverlayGateway
 ViewerGateway
-Admin
+GameClientGateway
 ```
 
-## 3. 直播端 Streamer Console
+## 3. 主播端 game-client
 
-主播登录后使用。
+主播登录后使用 `game-client` 作为主要直播画面。
 
 功能：
 
 ```text
-主播登录
-查看订阅状态
-创建 / 选择世界
-创建直播会话
-连接 TikTok 礼物来源
-打开 OBS Overlay
-查看 NPC 危机榜
-查看礼物事件
-查看观众创建的 NPC
-复制观众创建链接
-切换镜头 / 跟随 NPC
+读取世界快照
+展示 NPC 状态
+展示礼物反馈
+展示危机事件
+展示世界时间
+支持直播窗口采集
 ```
 
 路径规划：
 
 ```text
-/streamer/login
-/streamer/dashboard
-/streamer/worlds
-/streamer/worlds/:worldId
-/streamer/live-sessions/:liveSessionId
-/streamer/gift-connection
-/streamer/billing
+/game/:streamerHandle/:worldId
 ```
 
 UI 语言：日文。
 
-## 4. OBS Overlay
-
-Overlay 是直播端的一部分，但专门给 OBS Browser Source 使用。
-
-路径：
-
-```text
-/overlay/:streamerHandle/:worldId
-```
-
-分辨率：
-
-```text
-1920 × 1080
-```
-
-功能：
-
-```text
-2.5D 世界显示
-NPC 名字与状态条
-事件字幕
-礼物特效
-世界时间
-生存者 / 死亡者数量
-当前聚焦 NPC
-```
-
-Overlay 不显示敏感后台数据。
-
-## 5. 用户端 Viewer / Creator
+## 4. 用户端 Viewer / Creator
 
 观众通过主播分享的链接进入。
 
@@ -145,33 +97,32 @@ Overlay 不显示敏感后台数据。
 
 UI 语言：日文。
 
-## 6. 三端权限差异
+## 5. 首发差异
 
-| 功能 | 服务端 | 直播端 | 用户端 |
+| 功能 | 服务端 | game-client | 用户端 |
 |---|---|---|---|
 | 世界 Tick | 是 | 否 | 否 |
 | NPC 行为计算 | 是 | 否 | 否 |
-| 连接礼物源 | 是 | 发起 / 配置 | 否 |
-| 观察全世界 | API | 是 | 否 |
-| 查看自己的 NPC | API | 可查看所有 | 是 |
+| 连接礼物源 | 是 | 发起 / 展示 | 否 |
+| 观察世界 | API | 是 | 否 |
+| 查看自己的 NPC | API | 可查看摘要 | 是 |
 | 创建 NPC | API | 否 | 是 |
-| 管理订阅 | 是 | 是 | 否 |
+| 管理订阅 | 预留 | 否 | 否 |
 | 操作镜头 | 否 | 是 | 仅跟随自己 |
 
-## 7. MVP 实现
+## 6. 首发实现
 
-MVP 前端目录：
+首发前端目录：
+
+```text
+frontend/viewer
+game-client
+```
+
+后续再补：
 
 ```text
 frontend/streamer
 frontend/overlay
-frontend/viewer
-```
-
-Creator 暂时放在 viewer 中。
-
-后续可拆分：
-
-```text
-frontend/creator
+frontend/admin
 ```

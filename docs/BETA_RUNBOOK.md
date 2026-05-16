@@ -6,7 +6,7 @@
 npm run beta:demo
 ```
 
-This resets the database, starts backend + four frontends, opens Cloudflare Quick Tunnels, and prints the public URLs.
+This resets the database, starts backend + `game-client` + viewer, opens Cloudflare Quick Tunnels, and prints the public URLs.
 
 ## Pre-flight checks
 
@@ -35,13 +35,13 @@ npm run verify:tick-transaction
 
 ## Demo flow
 
-1. Open the streamer console URL.
+1. Open the `game-client` URL.
 2. Log in as `matt`.
-3. Start a live session.
-4. Copy the OBS Overlay URL and viewer create URL.
-5. Open the overlay and viewer URLs in separate tabs.
-6. Send a test gift from the console.
-7. Open the admin URL to watch live sessions and gift events.
+3. Load the default world.
+4. Open the viewer create URL in a separate tab.
+5. Send a test gift through the mock gift flow.
+6. Confirm the world snapshot and NPC state update in `game-client`.
+7. Open the viewer watch URL to verify "my NPC" flow.
 
 ## Recovery
 
