@@ -1,5 +1,8 @@
 import { defineConfig } from 'vite';
 
+const BACKEND_TARGET = 'http://127.0.0.1:3000';
+const resolvedBackendTarget = process.env.VITE_BACKEND_TARGET?.trim() || BACKEND_TARGET;
+
 export default defineConfig({
   appType: 'spa',
   server: {
@@ -7,7 +10,7 @@ export default defineConfig({
     port: 5177,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: resolvedBackendTarget,
         changeOrigin: true,
         ws: true,
       },
