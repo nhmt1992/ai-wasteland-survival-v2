@@ -55,6 +55,7 @@ backend/              服务端
 frontend/streamer     主播控制台
 frontend/overlay      OBS Overlay
 frontend/viewer       用户端 / 创建端
+game-client/          主播窗口游戏客户端
 supabase/schema.sql   数据库 Schema
 docs/                 设计与规格文档
 ```

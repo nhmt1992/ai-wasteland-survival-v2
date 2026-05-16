@@ -4,6 +4,7 @@
   "private": true,
   "workspaces": [
     "backend",
+    "game-client",
     "frontend/streamer",
     "frontend/overlay",
     "frontend/viewer",
@@ -11,6 +12,7 @@
   ],
   "scripts": {
     "dev:backend": "npm --workspace backend run dev",
+    "dev:game": "npm --workspace game-client run dev",
     "dev:streamer": "npm --workspace frontend/streamer run dev",
     "dev:overlay": "npm --workspace frontend/overlay run dev",
     "dev:viewer": "npm --workspace frontend/viewer run dev",
