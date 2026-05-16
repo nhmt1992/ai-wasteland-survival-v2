@@ -8,6 +8,24 @@ npm run beta:demo
 
 This resets the database, starts backend + four frontends, opens Cloudflare Quick Tunnels, and prints the public URLs.
 
+## Pre-flight checks
+
+Run the core verification set before a Beta demo or after touching Tick / gift / auth code:
+
+```bash
+npm run typecheck
+npm run build
+npm run db:verify
+npm run phase10:verify
+npm run phase11:verify
+npm run phase12:verify
+npm run phase13:verify
+npm run phase15:verify
+npm run verify:tick-transaction
+```
+
+`npm run verify:tick-transaction` covers the gift grant pickup loop and the rollback case for Tick persistence.
+
 ## Seed logins
 
 - `matt / matt-demo-123`

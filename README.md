@@ -10,6 +10,24 @@
 - 已支持多租户、主播登录、HttpOnly session、世界 Tick、礼物 Adapter、套餐限制、Admin Console、Billing Mock。
 - Overlay 已完成首轮视觉升级，进入“荒土末日 × 2.5D 等距 × 高清像素风 × 直播强化 UI”方向。
 
+## Beta 前验收
+
+在进行 Beta 演示或回归前，建议先跑下面这一组命令：
+
+```bash
+npm run typecheck
+npm run build
+npm run db:verify
+npm run phase10:verify
+npm run phase11:verify
+npm run phase12:verify
+npm run phase13:verify
+npm run phase15:verify
+npm run verify:tick-transaction
+```
+
+其中 `npm run verify:tick-transaction` 用来覆盖礼物补给箱拾取与 Tick 事务回滚的关键闭环。
+
 ## 一句话定位
 
 ```text
